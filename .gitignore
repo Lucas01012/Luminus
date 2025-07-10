@@ -1,0 +1,39 @@
+# Ambiente virtual
+venv/
+.venv/
+ENV/
+env/
+*.pyc
+__pycache__/
+
+# Arquivos de configuração e segurança
+.env
+*.env
+
+# Arquivos de log
+*.log
+
+# Pasta de build/distribuição
+build/
+dist/
+*.egg-info/
+
+# Cache do pip
+pip-wheel-metadata/
+*.egg
+*.whl
+
+# VS Code
+.vscode/
+
+# Sistema operacional (macOS, Windows, etc)
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook Checkpoints
+.ipynb_checkpoints/
+
+# Arquivos temporários
+*.tmp
+*.bak
+*.swp

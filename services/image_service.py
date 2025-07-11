@@ -1,17 +1,35 @@
-import tensorflow as tf
-import numpy as np
-import cv2
+from google.cloud import vision
+from google.cloud.vision_v1 import types
 
-model = tf.keras.applications.MobileNetV2(weights = 'imagenet')
+def process_image(image_file):
+    client = vision.ImageAnnotatorClient()
 
-def process_imagem(image_file):
-    npimg = np.frombuffer(image_file.read(), np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
-    resized = cv2.resize(img, (224, 224))
-    array = tf.keras.applications.mobilenet_v2.preprocess_input(
-        np.expand_dims(resized, axis= 0)
-    )
-    predictions = model.predict(array)
-    decoded = tf.keras.applications.mobilenet_v2.decode_predictions(predictions, top = 3)[0]
+    content = image_file.read()
 
-    return [{"objeto": obj[1], "confianca": float(obj[2])} for obj in decoded]
+    image = vision.Image(content = content)
+
+    response = client.label_detection(image = image)
+    labels = response.label_annotations
+
+    web_response = client.web_detection(image=image)
+    web_entities = web_response.web_detection.web_entities
+
+    result = {
+        "labels":[],
+        "web_entities":[]
+    }
+
+    for label in labels[:3]:
+        result["labels"].append({
+            "objeto": label.description,
+            "confianca": round(label.score, 2)
+        })
+
+    if web_entities:
+        for entity in web_entities[:3]:
+            result["web_entities"].append({
+                "descricao": entity.description,
+                "score": round(entity.score, 2)
+            })
+
+    return result

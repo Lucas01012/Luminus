@@ -1,6 +1,9 @@
+import os
 from flask import Flask
 from flask_cors import CORS
 from controllers.image_controller import image_bp
+
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "google_vision_key.json"
 
 app = Flask(__name__)
 CORS(app)

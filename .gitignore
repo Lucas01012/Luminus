@@ -37,3 +37,5 @@ Thumbs.db
 *.tmp
 *.bak
 *.swp
+
+google_vision_key.json

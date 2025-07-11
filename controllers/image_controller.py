@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services.image_service import process_imagem
+from services.image_service import process_image
 
 image_bp = Blueprint("image", __name__)
 
@@ -10,5 +10,5 @@ def analisar():
         return jsonify({"erro":"Nenhuma imagem foi enviada"}), 400
     
     imagem = request.files["imagem"]
-    resultado = process_imagem(imagem)
+    resultado = process_image(imagem)
     return jsonify(resultado)

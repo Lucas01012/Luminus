@@ -1,10 +1,10 @@
 import base64
 from google.cloud import vision
 import google.generativeai as genai
+import os
 
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 # Configure a API key (se ainda não tiver feito isso em outro lugar)
-genai.configure(api_key='AIzaSyBAWEIDFjauo5RMdkWH8mKagJDdc1XehT4')
-
 models = genai.list_models()
 for model in models:
     print(model.name)

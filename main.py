@@ -13,10 +13,6 @@ app.register_blueprint(image_bp)
 def home():
         return "Está rodando cidadão"
 
-@app.route("/teste2")
-def teste2():
-      return "Testando"
-
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
       

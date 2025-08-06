@@ -1,0 +1,349 @@
+import os
+import io
+import base64
+import tempfile
+import uuid
+import google.generativeai as genai
+
+# Fallback TTS usando síntese simples quando Google TTS não estiver disponível
+def simple_text_to_speech_fallback(text, voice_config=None):
+    """
+    Fallback simples quando Google TTS não está disponível
+    Retorna uma resposta estruturada similar ao TTS real
+    """
+    try:
+        # Configura Gemini para gerar instruções de áudio
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
+        
+        # Gera uma versão otimizada do texto para leitura
+        prompt = f"""
+        Otimize o seguinte texto para leitura em voz alta, adicionando pausas naturais 
+        e melhorando a fluidez. Retorne apenas o texto otimizado:
+        
+        {text}
+        """
+        
+        response = model.generate_content(prompt)
+        optimized_text = response.text.strip()
+        
+        # Simula resposta do TTS
+        audio_id = str(uuid.uuid4())
+        
+        # Para fins de desenvolvimento, retorna informações sobre o que seria o áudio
+        return {
+            "sucesso": True,
+            "modo": "fallback",
+            "audio_id": audio_id,
+            "texto_otimizado": optimized_text,
+            "audio_base64": None,  # Sem áudio real no fallback
+            "duracao_estimada": len(text.split()) / 150 * 60,  # Estimativa baseada em palavras
+            "mensagem": "TTS real não disponível. Texto otimizado para leitura gerado.",
+            "instrucoes": "Para áudio real, habilite a Google Cloud Text-to-Speech API",
+            "configuracao_usada": voice_config or {"language_code": "pt-BR", "fallback": True}
+        }
+        
+    except Exception as e:
+        return {
+            "sucesso": False,
+            "erro": f"Erro no fallback TTS: {str(e)}"
+        }
+
+try:
+    from google.cloud import texttospeech
+    GOOGLE_TTS_AVAILABLE = True
+except ImportError:
+    GOOGLE_TTS_AVAILABLE = False
+
+class TTSService:
+    def __init__(self):
+        if GOOGLE_TTS_AVAILABLE:
+            try:
+                self.client = texttospeech.TextToSpeechClient()
+                self.tts_enabled = True
+            except Exception as e:
+                print(f"Erro ao inicializar Google TTS: {e}")
+                self.tts_enabled = False
+        else:
+            self.tts_enabled = False
+        
+    def generate_audio(self, text, voice_config=None):
+        """
+        Converte texto em áudio com fallback se TTS não estiver disponível
+        """
+        if not self.tts_enabled:
+            return simple_text_to_speech_fallback(text, voice_config)
+            
+        try:
+            # Configuração padrão de voz
+            default_config = {
+                "language_code": "pt-BR",
+                "voice_name": "pt-BR-Wavenet-A",  # Voz feminina natural
+                "gender": "FEMALE",
+                "speaking_rate": 1.0,  # Velocidade normal
+                "pitch": 0.0,  # Tom normal
+                "volume_gain_db": 0.0  # Volume normal
+            }
+            
+            # Merge com configurações personalizadas
+            if voice_config:
+                default_config.update(voice_config)
+            
+            # Configura entrada de texto
+            synthesis_input = texttospeech.SynthesisInput(text=text)
+            
+            # Configura voz
+            voice = texttospeech.VoiceSelectionParams(
+                language_code=default_config["language_code"],
+                name=default_config["voice_name"],
+                ssml_gender=getattr(texttospeech.SsmlVoiceGender, default_config["gender"])
+            )
+            
+            # Configura áudio
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3,
+                speaking_rate=default_config["speaking_rate"],
+                pitch=default_config["pitch"],
+                volume_gain_db=default_config["volume_gain_db"]
+            )
+            
+            # Gera áudio
+            response = self.client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice,
+                audio_config=audio_config
+            )
+            
+            # Gera ID único para o arquivo
+            audio_id = str(uuid.uuid4())
+            
+            # Salva arquivo temporário
+            temp_dir = tempfile.gettempdir()
+            audio_path = os.path.join(temp_dir, f"luminus_audio_{audio_id}.mp3")
+            
+            with open(audio_path, "wb") as audio_file:
+                audio_file.write(response.audio_content)
+            
+            # Converte para Base64 para envio
+            audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
+            
+            return {
+                "sucesso": True,
+                "audio_id": audio_id,
+                "audio_base64": audio_base64,
+                "audio_path": audio_path,
+                "duracao_estimada": self._estimate_duration(text, default_config["speaking_rate"]),
+                "configuracao_usada": default_config,
+                "tamanho_arquivo": len(response.audio_content)
+            }
+            
+        except Exception as e:
+            return {
+                "sucesso": False,
+                "erro": f"Erro ao gerar áudio: {str(e)}",
+                "fallback_disponivel": True,
+                "sugestao": "Habilite a Google Cloud Text-to-Speech API ou use o modo fallback"
+            }
+    
+    def generate_ssml_audio(self, ssml_text, voice_config=None):
+        """
+        Gera áudio usando SSML para controle avançado de prosódia
+        """
+        try:
+            default_config = {
+                "language_code": "pt-BR",
+                "voice_name": "pt-BR-Wavenet-A",
+                "gender": "FEMALE"
+            }
+            
+            if voice_config:
+                default_config.update(voice_config)
+            
+            # Entrada SSML
+            synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
+            
+            voice = texttospeech.VoiceSelectionParams(
+                language_code=default_config["language_code"],
+                name=default_config["voice_name"],
+                ssml_gender=getattr(texttospeech.SsmlVoiceGender, default_config["gender"])
+            )
+            
+            audio_config = texttospeech.AudioConfig(
+                audio_encoding=texttospeech.AudioEncoding.MP3
+            )
+            
+            response = self.client.synthesize_speech(
+                input=synthesis_input,
+                voice=voice,
+                audio_config=audio_config
+            )
+            
+            audio_id = str(uuid.uuid4())
+            audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
+            
+            return {
+                "sucesso": True,
+                "audio_id": audio_id,
+                "audio_base64": audio_base64,
+                "tipo": "ssml",
+                "tamanho_arquivo": len(response.audio_content)
+            }
+            
+        except Exception as e:
+            return {
+                "sucesso": False,
+                "erro": f"Erro ao gerar áudio SSML: {str(e)}"
+            }
+    
+    def prepare_text_for_speech(self, text, options=None):
+        """
+        Prepara texto para síntese de voz com pausas inteligentes e formatação
+        """
+        if not options:
+            options = {}
+        
+        # Remove caracteres problemáticos
+        cleaned_text = text.replace('\n\n', '. ')
+        cleaned_text = cleaned_text.replace('\n', ' ')
+        
+        # Adiciona pausas em pontuações
+        if options.get("add_pauses", True):
+            cleaned_text = cleaned_text.replace('.', '. <break time="0.5s"/>')
+            cleaned_text = cleaned_text.replace('!', '! <break time="0.5s"/>')
+            cleaned_text = cleaned_text.replace('?', '? <break time="0.5s"/>')
+            cleaned_text = cleaned_text.replace(',', ', <break time="0.2s"/>')
+            cleaned_text = cleaned_text.replace(';', '; <break time="0.3s"/>')
+            cleaned_text = cleaned_text.replace(':', ': <break time="0.3s"/>')
+        
+        # Enfatiza títulos
+        if options.get("emphasize_headings", True):
+            # Detecta possíveis títulos (linhas curtas seguidas de quebra)
+            lines = text.split('\n')
+            for i, line in enumerate(lines):
+                if len(line) < 100 and line.isupper():  # Possível título
+                    cleaned_text = cleaned_text.replace(line, f'<emphasis level="strong">{line}</emphasis>')
+        
+        # Controla velocidade para diferentes seções
+        if options.get("variable_speed", False):
+            # Títulos mais devagar
+            cleaned_text = cleaned_text.replace('<emphasis level="strong">', '<emphasis level="strong"><prosody rate="0.8">')
+            cleaned_text = cleaned_text.replace('</emphasis>', '</prosody></emphasis>')
+        
+        # Wrap em SSML se necessário
+        if '<break' in cleaned_text or '<emphasis' in cleaned_text or '<prosody' in cleaned_text:
+            ssml_text = f'''
+            <speak>
+                {cleaned_text}
+            </speak>
+            '''
+            return {"text": ssml_text, "type": "ssml"}
+        
+        return {"text": cleaned_text, "type": "plain"}
+    
+    def split_long_text(self, text, max_chars=4000):
+        """
+        Divide texto longo em chunks para processamento TTS
+        """
+        if len(text) <= max_chars:
+            return [text]
+        
+        chunks = []
+        sentences = text.split('. ')
+        current_chunk = ""
+        
+        for sentence in sentences:
+            if len(current_chunk + sentence + '. ') <= max_chars:
+                current_chunk += sentence + '. '
+            else:
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                current_chunk = sentence + '. '
+        
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+    
+    def get_available_voices(self, language_code="pt-BR"):
+        """
+        Lista vozes disponíveis para um idioma
+        """
+        try:
+            voices_response = self.client.list_voices(language_code=language_code)
+            
+            voices = []
+            for voice in voices_response.voices:
+                if voice.language_codes[0] == language_code:
+                    voices.append({
+                        "name": voice.name,
+                        "gender": voice.ssml_gender.name,
+                        "natural": "Wavenet" in voice.name or "Neural2" in voice.name
+                    })
+            
+            return {
+                "sucesso": True,
+                "idioma": language_code,
+                "vozes": voices
+            }
+            
+        except Exception as e:
+            return {
+                "sucesso": False,
+                "erro": f"Erro ao listar vozes: {str(e)}"
+            }
+    
+    def _estimate_duration(self, text, speaking_rate=1.0):
+        """
+        Estima duração do áudio baseado no texto
+        """
+        # Aproximadamente 150 palavras por minuto em velocidade normal
+        words = len(text.split())
+        base_duration = (words / 150) * 60  # em segundos
+        adjusted_duration = base_duration / speaking_rate
+        
+        return round(adjusted_duration, 1)
+
+# Funções auxiliares para uso fácil
+def text_to_speech(text, voice_config=None):
+    """
+    Função helper para conversão rápida de texto em áudio
+    """
+    tts = TTSService()
+    return tts.generate_audio(text, voice_config)
+
+def prepare_document_audio(document_text, options=None):
+    """
+    Prepara documento completo para síntese de voz
+    """
+    tts = TTSService()
+    
+    # Prepara texto
+    prepared = tts.prepare_text_for_speech(document_text, options)
+    
+    # Divide em chunks se necessário
+    chunks = tts.split_long_text(prepared["text"])
+    
+    audio_parts = []
+    total_duration = 0
+    
+    for i, chunk in enumerate(chunks):
+        if prepared["type"] == "ssml":
+            result = tts.generate_ssml_audio(chunk)
+        else:
+            result = tts.generate_audio(chunk)
+        
+        if result["sucesso"]:
+            audio_parts.append({
+                "parte": i + 1,
+                "audio_id": result["audio_id"],
+                "audio_base64": result["audio_base64"],
+                "duracao": result.get("duracao_estimada", 0)
+            })
+            total_duration += result.get("duracao_estimada", 0)
+    
+    return {
+        "sucesso": True,
+        "total_partes": len(audio_parts),
+        "duracao_total": total_duration,
+        "partes": audio_parts
+    }

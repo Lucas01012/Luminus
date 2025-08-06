@@ -1,0 +1,297 @@
+{
+	"info": {
+		"name": "Luminus API - Funcionalidades Completas",
+		"description": "Coleção para testar todas as funcionalidades do Luminus: análise de imagens, processamento de documentos e TTS",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "📷 Análise de Imagens",
+			"item": [
+				{
+					"name": "Analisar Imagem - Gemini",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "imagem",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:5000/analisar?modo=gemini",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["analisar"],
+							"query": [
+								{
+									"key": "modo",
+									"value": "gemini"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Analisar Imagem - Vision",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "imagem",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:5000/analisar?modo=vision",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["analisar"],
+							"query": [
+								{
+									"key": "modo",
+									"value": "vision"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Ler Texto da Imagem (OCR)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "imagem",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:5000/ler-texto",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["ler-texto"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "📄 Processamento de Documentos",
+			"item": [
+				{
+					"name": "Processar Documento (PDF/DOCX)",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "arquivo",
+									"type": "file",
+									"src": ""
+								},
+								{
+									"key": "incluir_resumo",
+									"value": "true",
+									"type": "text"
+								},
+								{
+									"key": "extrair_estrutura",
+									"value": "true",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/processar-documento",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "processar-documento"]
+						}
+					}
+				},
+				{
+					"name": "OCR de Imagem Avançado",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "imagem",
+									"type": "file",
+									"src": ""
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/extrair-texto-imagem",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "extrair-texto-imagem"]
+						}
+					}
+				},
+				{
+					"name": "Buscar no Documento",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"texto_documento\": \"Texto completo do documento onde você quer buscar alguma palavra ou frase específica. Este é um exemplo de texto longo para demonstrar a funcionalidade de busca.\",\n  \"termo_busca\": \"exemplo\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/buscar-no-documento",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "buscar-no-documento"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🎵 Text-to-Speech (TTS)",
+			"item": [
+				{
+					"name": "Gerar Áudio - Simples",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"texto\": \"Olá! Este é um teste do sistema de síntese de voz do Luminus. Como você está ouvindo?\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/gerar-audio-documento",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "gerar-audio-documento"]
+						}
+					}
+				},
+				{
+					"name": "Gerar Áudio - Configurações Avançadas",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"texto\": \"Este é um teste com configurações personalizadas. O Luminus oferece controle total sobre a síntese de voz, incluindo velocidade, tom e tipo de voz.\",\n  \"velocidade\": 1.2,\n  \"voz\": \"pt-BR-Wavenet-A\",\n  \"genero\": \"FEMALE\",\n  \"tom\": 0.2,\n  \"idioma\": \"pt-BR\",\n  \"adicionar_pausas\": true,\n  \"enfatizar_titulos\": true,\n  \"velocidade_variavel\": false\n}"
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/gerar-audio-documento",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "gerar-audio-documento"]
+						}
+					}
+				},
+				{
+					"name": "Gerar Áudio - Texto Longo",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"texto\": \"O Luminus é uma solução inovadora de acessibilidade digital. Desenvolvido especificamente para pessoas com dificuldades visuais ou cognitivas, o sistema utiliza técnicas avançadas de inteligência artificial para processar imagens, documentos e textos de forma inteligente. Com reconhecimento de objetos via Google Vision API, descrições contextuais geradas pelo Google Gemini, OCR avançado para extração precisa de texto e agora síntese de voz de alta qualidade, o Luminus oferece uma experiência completa, fluida e verdadeiramente inclusiva. O objetivo principal é quebrar barreiras digitais e promover total autonomia no acesso à informação, permitindo que usuários tenham controle completo sobre como consumem conteúdo digital.\",\n  \"velocidade\": 1.0,\n  \"voz\": \"pt-BR-Wavenet-B\",\n  \"adicionar_pausas\": true,\n  \"enfatizar_titulos\": true\n}"
+						},
+						"url": {
+							"raw": "http://localhost:5000/documento/gerar-audio-documento",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "gerar-audio-documento"]
+						}
+					}
+				},
+				{
+					"name": "Listar Vozes Disponíveis",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/documento/vozes-disponiveis?idioma=pt-BR",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": ["documento", "vozes-disponiveis"],
+							"query": [
+								{
+									"key": "idioma",
+									"value": "pt-BR"
+								}
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "🏠 Teste Básico",
+			"item": [
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:5000/",
+							"protocol": "http",
+							"host": ["localhost"],
+							"port": "5000",
+							"path": [""]
+						}
+					}
+				}
+			]
+		}
+	]
+}

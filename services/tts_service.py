@@ -3,77 +3,15 @@ import io
 import base64
 import tempfile
 import uuid
-import google.generativeai as genai
-
-# Fallback TTS usando síntese simples quando Google TTS não estiver disponível
-def simple_text_to_speech_fallback(text, voice_config=None):
-    """
-    Fallback simples quando Google TTS não está disponível
-    Retorna uma resposta estruturada similar ao TTS real
-    """
-    try:
-        # Configura Gemini para gerar instruções de áudio
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash")
-        
-        # Gera uma versão otimizada do texto para leitura
-        prompt = f"""
-        Otimize o seguinte texto para leitura em voz alta, adicionando pausas naturais 
-        e melhorando a fluidez. Retorne apenas o texto otimizado:
-        
-        {text}
-        """
-        
-        response = model.generate_content(prompt)
-        optimized_text = response.text.strip()
-        
-        # Simula resposta do TTS
-        audio_id = str(uuid.uuid4())
-        
-        # Para fins de desenvolvimento, retorna informações sobre o que seria o áudio
-        return {
-            "sucesso": True,
-            "modo": "fallback",
-            "audio_id": audio_id,
-            "texto_otimizado": optimized_text,
-            "audio_base64": None,  # Sem áudio real no fallback
-            "duracao_estimada": len(text.split()) / 150 * 60,  # Estimativa baseada em palavras
-            "mensagem": "TTS real não disponível. Texto otimizado para leitura gerado.",
-            "instrucoes": "Para áudio real, habilite a Google Cloud Text-to-Speech API",
-            "configuracao_usada": voice_config or {"language_code": "pt-BR", "fallback": True}
-        }
-        
-    except Exception as e:
-        return {
-            "sucesso": False,
-            "erro": f"Erro no fallback TTS: {str(e)}"
-        }
-
-try:
-    from google.cloud import texttospeech
-    GOOGLE_TTS_AVAILABLE = True
-except ImportError:
-    GOOGLE_TTS_AVAILABLE = False
 
 class TTSService:
     def __init__(self):
-        if GOOGLE_TTS_AVAILABLE:
-            try:
-                self.client = texttospeech.TextToSpeechClient()
-                self.tts_enabled = True
-            except Exception as e:
-                print(f"Erro ao inicializar Google TTS: {e}")
-                self.tts_enabled = False
-        else:
-            self.tts_enabled = False
+        self.client = texttospeech.TextToSpeechClient()
         
     def generate_audio(self, text, voice_config=None):
         """
-        Converte texto em áudio com fallback se TTS não estiver disponível
+        Converte texto em áudio com configurações personalizáveis
         """
-        if not self.tts_enabled:
-            return simple_text_to_speech_fallback(text, voice_config)
-            
         try:
             # Configuração padrão de voz
             default_config = {
@@ -140,9 +78,7 @@ class TTSService:
         except Exception as e:
             return {
                 "sucesso": False,
-                "erro": f"Erro ao gerar áudio: {str(e)}",
-                "fallback_disponivel": True,
-                "sugestao": "Habilite a Google Cloud Text-to-Speech API ou use o modo fallback"
+                "erro": f"Erro ao gerar áudio: {str(e)}"
             }
     
     def generate_ssml_audio(self, ssml_text, voice_config=None):

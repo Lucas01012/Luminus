@@ -137,32 +137,6 @@ def gerar_audio_documento():
     except Exception as e:
         return jsonify({"erro": f"Erro na geração de áudio: {str(e)}"}), 500
 
-
-@document_bp.route("/gerar-audio-fallback", methods=["POST"])
-def gerar_audio_fallback():
-    """
-    Versão fallback do TTS usando Gemini quando Google TTS não está disponível
-    """
-    data = request.get_json()
-    
-    if not data or "texto" not in data:
-        return jsonify({"erro": "Campo 'texto' é obrigatório"}), 400
-    
-    try:
-        from services.tts_service import simple_text_to_speech_fallback
-        
-        voice_config = {
-            "language_code": data.get("idioma", "pt-BR"),
-            "voice_name": data.get("voz", "pt-BR-Wavenet-A"),
-            "speaking_rate": float(data.get("velocidade", 1.0))
-        }
-        
-        resultado = simple_text_to_speech_fallback(data["texto"], voice_config)
-        return jsonify(resultado)
-        
-    except Exception as e:
-        return jsonify({"erro": f"Erro no fallback TTS: {str(e)}"}), 500
-
 @document_bp.route("/vozes-disponiveis", methods=["GET"])
 def listar_vozes():
     """

@@ -6,7 +6,7 @@ from PIL import Image
 import google.generativeai as genai
 from google.cloud import vision
 import base64
-
+from google.cloud import texttospeech
 def extract_text_from_pdf(file_content):
     """
     Extrai texto de PDF com estrutura preservada

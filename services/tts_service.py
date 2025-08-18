@@ -3,7 +3,7 @@ import io
 import base64
 import tempfile
 import uuid
-
+from google.cloud import texttospeech
 class TTSService:
     def __init__(self):
         self.client = texttospeech.TextToSpeechClient()

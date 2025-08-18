@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from services.image_service import process_image_vision, process_image_gemini
 from google.cloud import vision  # necessário para o OCR
 from utils.image_optimizer import ImageOptimizer
+import traceback
 import time
 
 image_bp = Blueprint("image", __name__)
@@ -15,15 +16,13 @@ def analisar():
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
-    modo = request.args.get("modo", "gemini")  # ?modo=vision ou ?modo=gemini
+    modo = request.args.get("modo", "gemini")
 
     try:
-        # Otimiza imagem SEMPRE (principal ganho de performance)
+        # Otimiza imagem
         if modo == "vision":
-            # Vision precisa de mais detalhes para objetos
             optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(800, 800), quality=85)
         else:
-            # Gemini é muito eficiente com imagens menores
             optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
         
         if optimizer_result["success"]:
@@ -40,11 +39,14 @@ def analisar():
             resultado = process_image_gemini(optimized_image)
         
         processing_time = time.time() - start_time
-        resultado["processing_time"] = round(processing_time, 2)
+        # Corrigido: resultado é lista
+        resultado[0]["processing_time"] = round(processing_time, 2)
         
-        return jsonify(resultado)
+        return jsonify(resultado[0])
         
     except Exception as e:
+        print("ERRO AO PROCESSAR IMAGEM:")
+        traceback.print_exc()
         return jsonify({"erro": f"Erro no processamento: {str(e)}"}), 500
 
 

@@ -16,14 +16,13 @@ class TTSService:
             # Configuração padrão de voz
             default_config = {
                 "language_code": "pt-BR",
-                "voice_name": "pt-BR-Wavenet-A",  # Voz feminina natural
+                "voice_name": "pt-BR-Wavenet-A",
                 "gender": "FEMALE",
-                "speaking_rate": 1.0,  # Velocidade normal
-                "pitch": 0.0,  # Tom normal
-                "volume_gain_db": 0.0  # Volume normal
+                "speaking_rate": 1.0,
+                "pitch": 0.0,
+                "volume_gain_db": 0.0
             }
             
-            # Merge com configurações personalizadas
             if voice_config:
                 default_config.update(voice_config)
             
@@ -57,7 +56,7 @@ class TTSService:
             
             # Salva arquivo temporário
             temp_dir = tempfile.gettempdir()
-            audio_path = os.path.join(temp_dir, f"luminus_audio_{audio_id}.mp3")
+            audio_path = os.path.join(temp_dir, f"temp_audio_{audio_id}.mp3")
             
             with open(audio_path, "wb") as audio_file:
                 audio_file.write(response.audio_content)
@@ -95,7 +94,6 @@ class TTSService:
             if voice_config:
                 default_config.update(voice_config)
             
-            # Entrada SSML
             synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
             
             voice = texttospeech.VoiceSelectionParams(
@@ -138,11 +136,9 @@ class TTSService:
         if not options:
             options = {}
         
-        # Remove caracteres problemáticos
         cleaned_text = text.replace('\n\n', '. ')
         cleaned_text = cleaned_text.replace('\n', ' ')
         
-        # Adiciona pausas em pontuações
         if options.get("add_pauses", True):
             cleaned_text = cleaned_text.replace('.', '. <break time="0.5s"/>')
             cleaned_text = cleaned_text.replace('!', '! <break time="0.5s"/>')
@@ -151,21 +147,16 @@ class TTSService:
             cleaned_text = cleaned_text.replace(';', '; <break time="0.3s"/>')
             cleaned_text = cleaned_text.replace(':', ': <break time="0.3s"/>')
         
-        # Enfatiza títulos
         if options.get("emphasize_headings", True):
-            # Detecta possíveis títulos (linhas curtas seguidas de quebra)
             lines = text.split('\n')
             for i, line in enumerate(lines):
-                if len(line) < 100 and line.isupper():  # Possível título
+                if len(line) < 100 and line.isupper():
                     cleaned_text = cleaned_text.replace(line, f'<emphasis level="strong">{line}</emphasis>')
         
-        # Controla velocidade para diferentes seções
         if options.get("variable_speed", False):
-            # Títulos mais devagar
             cleaned_text = cleaned_text.replace('<emphasis level="strong">', '<emphasis level="strong"><prosody rate="0.8">')
             cleaned_text = cleaned_text.replace('</emphasis>', '</prosody></emphasis>')
         
-        # Wrap em SSML se necessário
         if '<break' in cleaned_text or '<emphasis' in cleaned_text or '<prosody' in cleaned_text:
             ssml_text = f'''
             <speak>
@@ -232,14 +223,12 @@ class TTSService:
         """
         Estima duração do áudio baseado no texto
         """
-        # Aproximadamente 150 palavras por minuto em velocidade normal
         words = len(text.split())
-        base_duration = (words / 150) * 60  # em segundos
+        base_duration = (words / 150) * 60
         adjusted_duration = base_duration / speaking_rate
         
         return round(adjusted_duration, 1)
 
-# Funções auxiliares para uso fácil
 def text_to_speech(text, voice_config=None):
     """
     Função helper para conversão rápida de texto em áudio
@@ -253,10 +242,8 @@ def prepare_document_audio(document_text, options=None):
     """
     tts = TTSService()
     
-    # Prepara texto
     prepared = tts.prepare_text_for_speech(document_text, options)
     
-    # Divide em chunks se necessário
     chunks = tts.split_long_text(prepared["text"])
     
     audio_parts = []

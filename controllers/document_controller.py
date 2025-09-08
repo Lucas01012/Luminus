@@ -22,7 +22,6 @@ def processar_documento():
     arquivo = request.files["arquivo"]
     filename = arquivo.filename.lower()
     
-    # Configurações opcionais
     incluir_resumo = request.form.get("incluir_resumo", "true").lower() == "true"
     extrair_estrutura = request.form.get("extrair_estrutura", "true").lower() == "true"
     
@@ -52,15 +51,12 @@ def processar_documento():
             "total_palavras": len(resultado["text_content"].split())
         }
         
-        # Inclui estrutura se solicitado
         if extrair_estrutura and "structure" in resultado:
             response_data["estrutura"] = resultado["structure"]
         
-        # Inclui metadados se disponível
         if "metadata" in resultado:
             response_data["metadados"] = resultado["metadata"]
         
-        # Gera resumo se solicitado
         if incluir_resumo and resultado["text_content"]:
             resumo = generate_document_summary(resultado["text_content"])
             if "erro" not in resumo:

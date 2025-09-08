@@ -93,15 +93,13 @@ def analisar_ultra_rapido():
     imagem = request.files["imagem"]
     
     try:
-        # Compressão extrema para velocidade máxima
         compressed_image = ImageOptimizer.compress_for_api(
             imagem, 
-            max_size=(256, 256),  # Mínimo possível
-            quality=30,           # Qualidade mínima aceitável
+            max_size=(256, 256),
+            quality=30,
             optimize=True
         )
         
-        # Apenas Gemini com configuração ultra-rápida
         resultado = process_image_gemini(compressed_image)
         
         processing_time = round(time.time() - start_time, 2)
@@ -114,7 +112,6 @@ def analisar_ultra_rapido():
         
         response = jsonify(response_data)
         
-        # Headers para performance
         response.headers['Cache-Control'] = 'no-cache, no-store'
         response.headers['Connection'] = 'close'
         

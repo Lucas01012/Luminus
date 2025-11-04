@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify
-from services.image_service import process_image_vision, process_image_gemini
-from google.cloud import vision  # necessário para o OCR
+from services.image_service import process_image_gemini
 from utils.image_optimizer import ImageOptimizer
 import traceback
 import time
@@ -10,42 +9,37 @@ image_bp = Blueprint("image", __name__)
 
 @image_bp.route("/analisar", methods=["POST"])
 def analisar():
+    """
+    Analisa imagem com Gemini AI (descrição detalhada para acessibilidade)
+    """
     start_time = time.time()
     
     if "imagem" not in request.files:
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
-    modo = request.args.get("modo", "gemini")
 
     try:
-        # Otimiza imagem
-        if modo == "vision":
-            optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(800, 800), quality=85)
-        else:
-            optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
+        # Otimiza imagem para Gemini
+        optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
         
         if optimizer_result["success"]:
             optimized_image = optimizer_result["optimized_image"]
-            print(f"Otimização: {optimizer_result['compression_ratio']}% menor - {optimizer_result['optimized_size']} bytes")
+            print(f"✅ Imagem otimizada: {optimizer_result['compression_ratio']}% menor")
         else:
             optimized_image = imagem
             imagem.seek(0)
         
-        # Processa com imagem otimizada
-        if modo == "vision":
-            resultado = process_image_vision(optimized_image)
-        else:
-            resultado = process_image_gemini(optimized_image)
+        # Processa com Gemini
+        resultado = process_image_gemini(optimized_image)
         
         processing_time = time.time() - start_time
-        # Corrigido: resultado é lista
         resultado[0]["processing_time"] = round(processing_time, 2)
         
         return jsonify(resultado[0])
         
     except Exception as e:
-        print("ERRO AO PROCESSAR IMAGEM:")
+        print("❌ ERRO AO PROCESSAR IMAGEM:")
         traceback.print_exc()
         return jsonify({"erro": f"Erro no processamento: {str(e)}"}), 500
 
@@ -125,20 +119,3 @@ def analisar_ultra_rapido():
         }), 500
 
 
-@image_bp.route("/ler-texto", methods=["POST"])
-def analisar_texto_imagem():
-    if "imagem" not in request.files:
-        return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
-
-    imagem = request.files["imagem"]
-    
-    client = vision.ImageAnnotatorClient()
-    content = imagem.read()
-    image = vision.Image(content=content)
-
-    response = client.text_detection(image=image)
-    texts = response.text_annotations
-
-    texto_detectado = texts[0].description if texts else "Nenhum texto detectado"
-
-    return jsonify({"texto": texto_detectado})

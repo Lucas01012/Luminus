@@ -2,11 +2,7 @@ import os
 import io
 import fitz  # PyMuPDF
 from docx import Document
-from PIL import Image
 import google.generativeai as genai
-from google.cloud import vision
-import base64
-from google.cloud import texttospeech
 def extract_text_from_pdf(file_content):
     """
     Extrai texto de PDF com estrutura preservada
@@ -140,74 +136,7 @@ def extract_text_from_docx(file_content):
     except Exception as e:
         return {"erro": f"Erro ao processar DOCX: {str(e)}"}
 
-def extract_text_from_image(image_content):
-    """
-    OCR avançado para extrair texto de imagens/documentos escaneados
-    """
-    try:
-        client = vision.ImageAnnotatorClient()
-        image = vision.Image(content=image_content)
-        
-        # OCR com detecção de estrutura de documento
-        response = client.document_text_detection(image=image)
-        document = response.full_text_annotation
-        
-        if not document.text:
-            return {"erro": "Nenhum texto detectado na imagem"}
-        
-        extracted_data = {
-            "text_content": document.text,
-            "structure": {
-                "blocks": [],
-                "paragraphs": [],
-                "words": []
-            },
-            "confidence": 0
-        }
-        
-        # Processa blocos de texto estruturados
-        for page in document.pages:
-            for block in page.blocks:
-                block_text = ""
-                block_confidence = 0
-                
-                for paragraph in block.paragraphs:
-                    para_text = ""
-                    para_confidence = 0
-                    
-                    for word in paragraph.words:
-                        word_text = ''.join([symbol.text for symbol in word.symbols])
-                        word_confidence = sum([symbol.confidence for symbol in word.symbols]) / len(word.symbols)
-                        
-                        para_text += word_text + " "
-                        para_confidence += word_confidence
-                        
-                        extracted_data["structure"]["words"].append({
-                            "text": word_text,
-                            "confidence": round(word_confidence, 2)
-                        })
-                    
-                    if para_text.strip():
-                        extracted_data["structure"]["paragraphs"].append({
-                            "text": para_text.strip(),
-                            "confidence": round(para_confidence / len(paragraph.words), 2)
-                        })
-                        block_text += para_text + "\n"
-                
-                if block_text.strip():
-                    extracted_data["structure"]["blocks"].append({
-                        "text": block_text.strip(),
-                        "confidence": round(block_confidence, 2)
-                    })
-        
-        # Calcula confiança geral
-        word_confidences = [word["confidence"] for word in extracted_data["structure"]["words"]]
-        extracted_data["confidence"] = round(sum(word_confidences) / len(word_confidences), 2) if word_confidences else 0
-        
-        return extracted_data
-        
-    except Exception as e:
-        return {"erro": f"Erro no OCR da imagem: {str(e)}"}
+
 
 def generate_document_summary(text_content):
     """
@@ -296,3 +225,59 @@ def search_text_in_document(text_content, search_term):
         "total_ocorrencias": len(results),
         "resultados": results[:10]  # Limita a 10 resultados
     }
+
+def process_document(file_content, file_name, file_type, gerar_resumo=True):
+    """
+    Processa documentos PDF e DOCX
+    - PDFs: extração com PyMuPDF preservando estrutura
+    - DOCX: extração com python-docx incluindo tabelas
+    - Resumo: geração automática com Gemini AI (opcional)
+    """
+    try:
+        # Valida tipo de arquivo
+        is_pdf = 'pdf' in file_type.lower() or file_name.lower().endswith('.pdf')
+        is_docx = ('word' in file_type.lower() or 
+                   'document' in file_type.lower() or 
+                   file_name.lower().endswith(('.docx', '.doc')))
+        
+        if not (is_pdf or is_docx):
+            return {
+                "erro": "Tipo de arquivo não suportado. Use PDF ou DOCX.",
+                "tipos_aceitos": ["PDF", "DOCX"]
+            }
+        
+        # Processa documento
+        print(f"� Processando {'PDF' if is_pdf else 'DOCX'}: {file_name}")
+        
+        if is_pdf:
+            resultado = extract_text_from_pdf(file_content)
+        else:
+            resultado = extract_text_from_docx(file_content)
+        
+        # Verifica erros
+        if not resultado or 'erro' in resultado:
+            return resultado or {"erro": "Erro ao processar documento"}
+        
+        # Adiciona metadados
+        resultado['arquivo_info'] = {
+            'nome': file_name,
+            'tipo': file_type,
+            'tamanho_bytes': len(file_content),
+            'formato': 'PDF' if is_pdf else 'DOCX'
+        }
+        
+        # Gera resumo inteligente (opcional)
+        if gerar_resumo and resultado.get('text_content'):
+            print("🤖 Gerando resumo com Gemini...")
+            resumo_data = generate_document_summary(resultado['text_content'])
+            
+            if 'erro' not in resumo_data:
+                resultado['resumo'] = resumo_data.get('resumo')
+                resultado['palavras_chave'] = resumo_data.get('palavras_chave')
+        
+        print("✅ Documento processado com sucesso!")
+        return resultado
+        
+    except Exception as e:
+        print(f"❌ Erro: {str(e)}")
+        return {"erro": f"Erro ao processar documento: {str(e)}"}

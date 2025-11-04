@@ -1,55 +1,5 @@
-import base64
-from google.cloud import vision
-import google.generativeai as genai
 import os
-from utils.image_optimizer import ImageOptimizer
-
-def process_image_vision(image_file):
-    try:
-        # Otimiza imagem primeiro
-        optimizer_result = ImageOptimizer.optimize_for_ai(image_file, max_size=(800, 800), quality=80)
-        
-        if optimizer_result["success"]:
-            optimized_image = optimizer_result["optimized_image"]
-            print(f"Imagem otimizada: {optimizer_result['compression_ratio']}% menor")
-        else:
-            optimized_image = image_file
-            image_file.seek(0)
-        
-        client = vision.ImageAnnotatorClient()
-        content = optimized_image.read()
-        image = vision.Image(content=content)
-
-        label_response = client.label_detection(image=image)
-        labels = label_response.label_annotations
-
-        # web_response = client.web_detection(image=image)
-        # web_entities = web_response.web_detection.web_entities
-
-        result = {
-            "labels": [],
-        }
-
-        for label in labels[:3]:
-            if label.score > 0.7:
-                result["labels"].append({
-                    "objeto": label.description,
-                    "confianca": round(label.score, 2)
-                })
-
-        # if web_entities:
-        #     for entity in web_entities[:3]:
-        #         if entity.description:
-        #             result["web_entities"].append({
-        #                 "descricao": entity.description,
-        #                 "score": round(entity.score, 2)
-        #             })
-
-        return result
-        
-    except Exception as e:
-        return {"erro": f"Erro no Vision: {str(e)}"}
-
+import google.generativeai as genai
 
 def process_image_gemini(image_file):
     try:

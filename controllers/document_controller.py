@@ -1,71 +1,48 @@
 from flask import Blueprint, request, jsonify
 from services.document_service import (
-    extract_text_from_pdf, 
-    extract_text_from_docx, 
-    extract_text_from_image,
-    generate_document_summary,
+    process_document,
     search_text_in_document
 )
-from services.tts_service import text_to_speech, prepare_document_audio
-import os
+from services.tts_service import TTSService, prepare_document_audio
 
 document_bp = Blueprint("document", __name__)
 
-@document_bp.route("/processar-documento", methods=["POST"])
+@document_bp.route("/processar", methods=["POST"])
 def processar_documento():
     """
-    Processa documentos PDF, DOCX ou imagens escaneadas
+    Endpoint unificado para processar documentos PDF e DOCX
+    
+    Aceita:
+    - arquivo: PDF ou DOCX
+    - gerar_resumo: true/false (opcional, padrão: true)
+    
+    Retorna:
+    - text_content: texto completo extraído
+    - structure: estrutura do documento (títulos, parágrafos, tabelas)
+    - arquivo_info: metadados do arquivo
+    - resumo: resumo gerado por IA (se solicitado)
+    - palavras_chave: palavras-chave principais
     """
     if "arquivo" not in request.files:
-        return jsonify({"erro": "Nenhum arquivo foi enviado"}), 400
+        return jsonify({"erro": "Nenhum arquivo enviado no campo 'arquivo'"}), 400
     
     arquivo = request.files["arquivo"]
-    filename = arquivo.filename.lower()
-    
-    incluir_resumo = request.form.get("incluir_resumo", "true").lower() == "true"
-    extrair_estrutura = request.form.get("extrair_estrutura", "true").lower() == "true"
+    gerar_resumo = request.form.get("gerar_resumo", "true").lower() == "true"
     
     try:
-        # Lê conteúdo do arquivo
         file_content = arquivo.read()
+        file_type = arquivo.content_type or ""
+        file_name = arquivo.filename or "documento"
         
-        # Processa baseado no tipo de arquivo
-        if filename.endswith('.pdf'):
-            resultado = extract_text_from_pdf(file_content)
-        elif filename.endswith('.docx'):
-            resultado = extract_text_from_docx(file_content)
-        elif filename.endswith(('.jpg', '.jpeg', '.png', '.tiff', '.bmp')):
-            resultado = extract_text_from_image(file_content)
-        else:
-            return jsonify({"erro": "Formato de arquivo não suportado. Use PDF, DOCX ou imagens."}), 400
+        resultado = process_document(file_content, file_name, file_type, gerar_resumo)
         
         if "erro" in resultado:
             return jsonify(resultado), 400
         
-        # Adiciona informações extras
-        response_data = {
-            "arquivo": filename,
-            "tipo": "pdf" if filename.endswith('.pdf') else "docx" if filename.endswith('.docx') else "imagem",
-            "texto_extraido": resultado["text_content"],
-            "total_caracteres": len(resultado["text_content"]),
-            "total_palavras": len(resultado["text_content"].split())
-        }
-        
-        if extrair_estrutura and "structure" in resultado:
-            response_data["estrutura"] = resultado["structure"]
-        
-        if "metadata" in resultado:
-            response_data["metadados"] = resultado["metadata"]
-        
-        if incluir_resumo and resultado["text_content"]:
-            resumo = generate_document_summary(resultado["text_content"])
-            if "erro" not in resumo:
-                response_data["resumo"] = resumo
-        
-        return jsonify(response_data)
+        return jsonify(resultado)
         
     except Exception as e:
-        return jsonify({"erro": f"Erro no processamento: {str(e)}"}), 500
+        return jsonify({"erro": f"Erro ao processar documento: {str(e)}"}), 500
 
 @document_bp.route("/buscar-no-documento", methods=["POST"])
 def buscar_no_documento():
@@ -136,46 +113,17 @@ def gerar_audio_documento():
 @document_bp.route("/vozes-disponiveis", methods=["GET"])
 def listar_vozes():
     """
-    Lista vozes disponíveis para TTS
+    Lista vozes disponíveis para TTS (Text-to-Speech)
+    
+    Query params:
+    - idioma: código do idioma (opcional, padrão: pt-BR)
     """
     idioma = request.args.get("idioma", "pt-BR")
     
     try:
-        from services.tts_service import TTSService
         tts = TTSService()
         resultado = tts.get_available_voices(idioma)
         return jsonify(resultado)
         
     except Exception as e:
         return jsonify({"erro": f"Erro ao listar vozes: {str(e)}"}), 500
-
-@document_bp.route("/extrair-texto-imagem", methods=["POST"])
-def extrair_texto_imagem():
-    """
-    OCR especializado para documentos em imagem
-    """
-    if "imagem" not in request.files:
-        return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
-    
-    imagem = request.files["imagem"]
-    
-    try:
-        content = imagem.read()
-        resultado = extract_text_from_image(content)
-        
-        if "erro" in resultado:
-            return jsonify(resultado), 400
-        
-        return jsonify({
-            "texto_extraido": resultado["text_content"],
-            "confianca_geral": resultado["confidence"],
-            "estrutura": resultado["structure"],
-            "total_palavras": len(resultado["structure"]["words"]),
-            "palavras_baixa_confianca": [
-                word for word in resultado["structure"]["words"] 
-                if word["confidence"] < 0.7
-            ]
-        })
-        
-    except Exception as e:
-        return jsonify({"erro": f"Erro no OCR: {str(e)}"}), 500

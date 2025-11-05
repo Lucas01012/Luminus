@@ -13,7 +13,6 @@ class TTSService:
         Converte texto em áudio com configurações personalizáveis
         """
         try:
-            # Configuração padrão de voz
             default_config = {
                 "language_code": "pt-BR",
                 "voice_name": "pt-BR-Wavenet-A",
@@ -26,17 +25,14 @@ class TTSService:
             if voice_config:
                 default_config.update(voice_config)
             
-            # Configura entrada de texto
             synthesis_input = texttospeech.SynthesisInput(text=text)
             
-            # Configura voz
             voice = texttospeech.VoiceSelectionParams(
                 language_code=default_config["language_code"],
                 name=default_config["voice_name"],
                 ssml_gender=getattr(texttospeech.SsmlVoiceGender, default_config["gender"])
             )
             
-            # Configura áudio
             audio_config = texttospeech.AudioConfig(
                 audio_encoding=texttospeech.AudioEncoding.MP3,
                 speaking_rate=default_config["speaking_rate"],
@@ -44,24 +40,20 @@ class TTSService:
                 volume_gain_db=default_config["volume_gain_db"]
             )
             
-            # Gera áudio
             response = self.client.synthesize_speech(
                 input=synthesis_input,
                 voice=voice,
                 audio_config=audio_config
             )
             
-            # Gera ID único para o arquivo
             audio_id = str(uuid.uuid4())
             
-            # Salva arquivo temporário
             temp_dir = tempfile.gettempdir()
             audio_path = os.path.join(temp_dir, f"temp_audio_{audio_id}.mp3")
             
             with open(audio_path, "wb") as audio_file:
                 audio_file.write(response.audio_content)
             
-            # Converte para Base64 para envio
             audio_base64 = base64.b64encode(response.audio_content).decode('utf-8')
             
             return {

@@ -39,3 +39,4 @@ Thumbs.db
 *.swp
 
 google_vision_key.json
+firebase-service-account.json

@@ -71,7 +71,6 @@ def gerar_audio_documento():
     if not data or "texto" not in data:
         return jsonify({"erro": "Campo 'texto' é obrigatório"}), 400
     
-    # Configurações de voz opcionais
     voice_config = {
         "language_code": data.get("idioma", "pt-BR"),
         "voice_name": data.get("voz", "pt-BR-Wavenet-A"),
@@ -80,7 +79,6 @@ def gerar_audio_documento():
         "pitch": float(data.get("tom", 0.0))
     }
     
-    # Opções de processamento
     options = {
         "add_pauses": data.get("adicionar_pausas", True),
         "emphasize_headings": data.get("enfatizar_titulos", True),
@@ -90,16 +88,13 @@ def gerar_audio_documento():
     try:
         texto = data["texto"]
         
-        # Para textos longos, usa processamento especial
         if len(texto) > 4000:
             resultado = prepare_document_audio(texto, options)
         else:
-            # Prepara texto
             from services.tts_service import TTSService
             tts = TTSService()
             prepared = tts.prepare_text_for_speech(texto, options)
             
-            # Gera áudio
             if prepared["type"] == "ssml":
                 resultado = tts.generate_ssml_audio(prepared["text"], voice_config)
             else:

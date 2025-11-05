@@ -20,17 +20,15 @@ def analisar():
     imagem = request.files["imagem"]
 
     try:
-        # Otimiza imagem para Gemini
         optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
         
         if optimizer_result["success"]:
             optimized_image = optimizer_result["optimized_image"]
-            print(f"✅ Imagem otimizada: {optimizer_result['compression_ratio']}% menor")
+            print(f"Imagem otimizada: {optimizer_result['compression_ratio']}% menor")
         else:
             optimized_image = imagem
             imagem.seek(0)
         
-        # Processa com Gemini
         resultado = process_image_gemini(optimized_image)
         
         processing_time = time.time() - start_time
@@ -39,7 +37,7 @@ def analisar():
         return jsonify(resultado[0])
         
     except Exception as e:
-        print("❌ ERRO AO PROCESSAR IMAGEM:")
+        print("ERRO AO PROCESSAR IMAGEM:")
         traceback.print_exc()
         return jsonify({"erro": f"Erro no processamento: {str(e)}"}), 500
 
@@ -57,13 +55,11 @@ def analisar_rapido():
     imagem = request.files["imagem"]
     
     try:
-        # Redimensionamento ultra-rápido
         quick_image = ImageOptimizer.quick_resize(imagem, target_size=(256, 256))
         if not quick_image:
             quick_image = imagem
             imagem.seek(0)
         
-        # Só Gemini (mais rápido que Vision)
         resultado = process_image_gemini(quick_image)
         
         processing_time = time.time() - start_time

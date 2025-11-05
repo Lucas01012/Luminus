@@ -1,6 +1,6 @@
 import os
 import io
-import fitz  # PyMuPDF
+import fitz
 from docx import Document
 import google.generativeai as genai
 def extract_text_from_pdf(file_content):
@@ -29,7 +29,6 @@ def extract_text_from_pdf(file_content):
         for page_num in range(len(pdf_doc)):
             page = pdf_doc.load_page(page_num)
             
-            # Extrai texto estruturado
             blocks = page.get_text("dict")
             page_text = ""
             page_structure = {
@@ -50,7 +49,6 @@ def extract_text_from_pdf(file_content):
                             font_size = max(font_size, span["size"])
                         
                         if line_text.strip():
-                            # Identifica títulos por tamanho da fonte
                             if font_size > 14:
                                 page_structure["headings"].append({
                                     "text": line_text.strip(),
@@ -101,7 +99,6 @@ def extract_text_from_docx(file_content):
         
         for para in doc.paragraphs:
             if para.text.strip():
-                # Verifica se é um título
                 if para.style.name.startswith('Heading'):
                     level = int(para.style.name.split()[-1]) if para.style.name.split()[-1].isdigit() else 1
                     extracted_data["structure"]["headings"].append({
@@ -115,7 +112,6 @@ def extract_text_from_docx(file_content):
                 
                 full_text += para.text + "\n"
         
-        # Processa tabelas
         for table in doc.tables:
             table_data = []
             for row in table.rows:
@@ -171,10 +167,8 @@ def extract_keywords_from_text(text):
     """
     Extrai palavras-chave importantes do texto
     """
-    # Implementação simples - pode ser melhorada com NLP mais avançado
     words = text.lower().split()
     
-    # Remove palavras comuns (stop words)
     stop_words = {
         'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos', 'das',
         'em', 'no', 'na', 'nos', 'nas', 'por', 'para', 'com', 'sem', 'sob', 'sobre',
@@ -184,7 +178,6 @@ def extract_keywords_from_text(text):
         'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'isso', 'aquilo'
     }
     
-    # Filtra palavras significativas
     keywords = []
     word_count = {}
     
@@ -193,7 +186,6 @@ def extract_keywords_from_text(text):
         if len(clean_word) > 3 and clean_word not in stop_words:
             word_count[clean_word] = word_count.get(clean_word, 0) + 1
     
-    # Ordena por frequência e pega as top 10
     sorted_words = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
     keywords = [word for word, count in sorted_words[:10]]
     
@@ -208,7 +200,6 @@ def search_text_in_document(text_content, search_term):
     
     for i, line in enumerate(lines):
         if search_term.lower() in line.lower():
-            # Contexto: linha anterior, atual e próxima
             context_start = max(0, i - 1)
             context_end = min(len(lines), i + 2)
             context = '\n'.join(lines[context_start:context_end])
@@ -223,7 +214,7 @@ def search_text_in_document(text_content, search_term):
     return {
         "termo_busca": search_term,
         "total_ocorrencias": len(results),
-        "resultados": results[:10]  # Limita a 10 resultados
+        "resultados": results[:10]
     }
 
 def process_document(file_content, file_name, file_type, gerar_resumo=True):
@@ -234,7 +225,6 @@ def process_document(file_content, file_name, file_type, gerar_resumo=True):
     - Resumo: geração automática com Gemini AI (opcional)
     """
     try:
-        # Valida tipo de arquivo
         is_pdf = 'pdf' in file_type.lower() or file_name.lower().endswith('.pdf')
         is_docx = ('word' in file_type.lower() or 
                    'document' in file_type.lower() or 
@@ -246,19 +236,16 @@ def process_document(file_content, file_name, file_type, gerar_resumo=True):
                 "tipos_aceitos": ["PDF", "DOCX"]
             }
         
-        # Processa documento
-        print(f"� Processando {'PDF' if is_pdf else 'DOCX'}: {file_name}")
+        print(f"Processando {'PDF' if is_pdf else 'DOCX'}: {file_name}")
         
         if is_pdf:
             resultado = extract_text_from_pdf(file_content)
         else:
             resultado = extract_text_from_docx(file_content)
         
-        # Verifica erros
         if not resultado or 'erro' in resultado:
             return resultado or {"erro": "Erro ao processar documento"}
         
-        # Adiciona metadados
         resultado['arquivo_info'] = {
             'nome': file_name,
             'tipo': file_type,
@@ -266,18 +253,17 @@ def process_document(file_content, file_name, file_type, gerar_resumo=True):
             'formato': 'PDF' if is_pdf else 'DOCX'
         }
         
-        # Gera resumo inteligente (opcional)
         if gerar_resumo and resultado.get('text_content'):
-            print("🤖 Gerando resumo com Gemini...")
+            print("Gerando resumo com Gemini...")
             resumo_data = generate_document_summary(resultado['text_content'])
             
             if 'erro' not in resumo_data:
                 resultado['resumo'] = resumo_data.get('resumo')
                 resultado['palavras_chave'] = resumo_data.get('palavras_chave')
         
-        print("✅ Documento processado com sucesso!")
+        print("Documento processado com sucesso!")
         return resultado
         
     except Exception as e:
-        print(f"❌ Erro: {str(e)}")
+        print(f"Erro: {str(e)}")
         return {"erro": f"Erro ao processar documento: {str(e)}"}

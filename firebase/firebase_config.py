@@ -1,10 +1,5 @@
-import firebase
-from firebase import credentials, storage, firestore
+import firebase_admin
+from firebase_admin import credentials, storage, firestore
 
-cred = credentials.Certificate("firebase-creds.json")
-firebase.initialize_app(cred, {
-    'storageBucket':'meu.projeto.appspot.com'
-})
-
-db = firebase.client()
-bucket = storage.bucket()
+cred = credentials.Certificate("credentials\firebase-service-account.json")
+firebase_admin.initialize_app(cred)

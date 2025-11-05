@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 from services.image_service import process_image_gemini
+from services.history_service import HistoryService
 from utils.image_optimizer import ImageOptimizer
+from middleware.auth_middleware import optional_auth
 import traceback
 import time
 
@@ -8,6 +10,7 @@ image_bp = Blueprint("image", __name__)
 
 
 @image_bp.route("/analisar", methods=["POST"])
+@optional_auth
 def analisar():
     """
     Analisa imagem com Gemini AI (descrição detalhada para acessibilidade)
@@ -18,6 +21,7 @@ def analisar():
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
+    imagem_nome = imagem.filename
 
     try:
         optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
@@ -34,6 +38,20 @@ def analisar():
         processing_time = time.time() - start_time
         resultado[0]["processing_time"] = round(processing_time, 2)
         
+        # Salvar no histórico se o usuário estiver autenticado
+        if hasattr(request, 'user_id') and request.user_id:
+            try:
+                HistoryService.save_image_analysis(
+                    usuario_id=request.user_id,
+                    imagem_nome=imagem_nome,
+                    resultado=resultado[0],
+                    processing_time=processing_time
+                )
+                print(f"✅ Histórico salvo para usuário {request.user_id}")
+            except Exception as hist_error:
+                print(f"⚠️ Erro ao salvar histórico: {hist_error}")
+                # Não falha a requisição se o histórico falhar
+        
         return jsonify(resultado[0])
         
     except Exception as e:
@@ -43,6 +61,7 @@ def analisar():
 
 
 @image_bp.route("/analisar-rapido", methods=["POST"])
+@optional_auth
 def analisar_rapido():
     """
     Versão otimizada para máxima velocidade
@@ -53,6 +72,7 @@ def analisar_rapido():
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
+    imagem_nome = imagem.filename
     
     try:
         quick_image = ImageOptimizer.quick_resize(imagem, target_size=(256, 256))
@@ -66,6 +86,18 @@ def analisar_rapido():
         resultado[0]["processing_time"] = round(processing_time, 2)
         resultado[0]["mode"] = "rapido"
         
+        # Salvar no histórico se autenticado
+        if hasattr(request, 'user_id') and request.user_id:
+            try:
+                HistoryService.save_image_analysis(
+                    usuario_id=request.user_id,
+                    imagem_nome=imagem_nome,
+                    resultado=resultado[0],
+                    processing_time=processing_time
+                )
+            except Exception as hist_error:
+                print(f"⚠️ Erro ao salvar histórico: {hist_error}")
+        
         return jsonify(resultado[0])
         
     except Exception as e:
@@ -73,6 +105,7 @@ def analisar_rapido():
 
 
 @image_bp.route("/analisar-ultra", methods=["POST"])
+@optional_auth
 def analisar_ultra_rapido():
     """Versão ultra-otimizada para máxima velocidade (sub 3 segundos)"""
     start_time = time.time()
@@ -81,6 +114,7 @@ def analisar_ultra_rapido():
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
+    imagem_nome = imagem.filename
     
     try:
         compressed_image = ImageOptimizer.compress_for_api(
@@ -99,6 +133,20 @@ def analisar_ultra_rapido():
             "tempo_processamento": f"{processing_time}s",
             "modo": "ultra-rapido"
         }
+        
+        # Salvar no histórico se autenticado
+        if hasattr(request, 'user_id') and request.user_id:
+            try:
+                full_resultado = resultado[0].copy() if resultado else {}
+                full_resultado["processing_time"] = processing_time
+                HistoryService.save_image_analysis(
+                    usuario_id=request.user_id,
+                    imagem_nome=imagem_nome,
+                    resultado=full_resultado,
+                    processing_time=processing_time
+                )
+            except Exception as hist_error:
+                print(f"⚠️ Erro ao salvar histórico: {hist_error}")
         
         response = jsonify(response_data)
         

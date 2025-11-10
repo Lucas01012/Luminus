@@ -1,6 +1,8 @@
-from firebase.firebase_config import db
+from firebase.firebase_config import db, bucket
 from firebase_admin import firestore
 from datetime import datetime
+import io
+import uuid
 
 class HistoryService:
     """
@@ -8,14 +10,15 @@ class HistoryService:
     """
     
     @staticmethod
-    def save_image_analysis(user_id, image_name, analysis_result):
+    def save_image_analysis(user_id, image_name, analysis_result, image_file=None):
         """
-        Salva histórico de análise de imagem no Firestore
+        Salva histórico de análise de imagem no Firestore + Firebase Storage
         
         Args:
             user_id: UID do usuário
             image_name: Nome do arquivo de imagem
             analysis_result: Resultado da análise (dict com objeto, confianca, etc)
+            image_file: Arquivo de imagem (FileStorage object ou bytes)
             
         Returns:
             dict com sucesso e id do documento ou erro
@@ -23,9 +26,49 @@ class HistoryService:
         try:
             doc_ref = db.collection("historico_imagens").document()
             
+            image_url = None
+            
+            # Se a imagem foi fornecida, faz upload para Firebase Storage
+            if image_file:
+                try:
+                    # Gera nome único para o arquivo
+                    file_extension = image_name.split('.')[-1] if '.' in image_name else 'jpg'
+                    unique_filename = f"historico/{user_id}/{doc_ref.id}.{file_extension}"
+                    
+                    # Prepara o arquivo para upload
+                    blob = bucket.blob(unique_filename)
+                    
+                    # Se for FileStorage (Flask), pega o conteúdo
+                    if hasattr(image_file, 'read'):
+                        image_file.seek(0)  # Volta ao início do arquivo
+                        image_data = image_file.read()
+                    elif hasattr(image_file, 'getvalue'):
+                        # BytesIO
+                        image_data = image_file.getvalue()
+                    else:
+                        # Já é bytes
+                        image_data = image_file
+                    
+                    # Upload para Firebase Storage
+                    blob.upload_from_string(
+                        image_data,
+                        content_type=f'image/{file_extension}'
+                    )
+                    
+                    # Torna público e gera URL
+                    blob.make_public()
+                    image_url = blob.public_url
+                    
+                    print(f"✅ Imagem salva no Storage: {unique_filename}")
+                    
+                except Exception as storage_error:
+                    print(f"⚠️ Erro ao salvar imagem no Storage: {storage_error}")
+                    # Continua salvando os dados mesmo sem a imagem
+            
             data = {
                 "usuario_id": user_id,
                 "imagem_nome": image_name,
+                "imagem_url": image_url,  # ← URL da imagem no Storage
                 "objeto_detectado": analysis_result.get('objeto', ''),
                 "confianca": analysis_result.get('confianca'),
                 "processing_time": analysis_result.get('processing_time'),
@@ -38,6 +81,7 @@ class HistoryService:
             return {
                 "sucesso": True,
                 "doc_id": doc_ref.id,
+                "imagem_url": image_url,
                 "mensagem": "Análise salva no histórico"
             }
             

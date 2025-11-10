@@ -5,6 +5,7 @@ from utils.image_optimizer import ImageOptimizer
 from middleware.auth_middleware import optional_auth
 import traceback
 import time
+import io
 
 image_bp = Blueprint("image", __name__)
 
@@ -24,6 +25,10 @@ def analisar():
     imagem_nome = imagem.filename
 
     try:
+        # Lê a imagem original para salvar no histórico
+        imagem_original = io.BytesIO(imagem.read())
+        imagem.seek(0)  # Reseta para processar
+        
         optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
         
         if optimizer_result["success"]:
@@ -42,10 +47,10 @@ def analisar():
         if hasattr(request, 'user_id') and request.user_id:
             try:
                 HistoryService.save_image_analysis(
-                    usuario_id=request.user_id,
-                    imagem_nome=imagem_nome,
-                    resultado=resultado[0],
-                    processing_time=processing_time
+                    user_id=request.user_id,
+                    image_name=imagem_nome,
+                    analysis_result=resultado[0],
+                    image_file=imagem_original  # ← Passa a imagem original
                 )
                 print(f"✅ Histórico salvo para usuário {request.user_id}")
             except Exception as hist_error:
@@ -75,6 +80,10 @@ def analisar_rapido():
     imagem_nome = imagem.filename
     
     try:
+        # Lê a imagem original para salvar no histórico
+        imagem_original = io.BytesIO(imagem.read())
+        imagem.seek(0)
+        
         quick_image = ImageOptimizer.quick_resize(imagem, target_size=(256, 256))
         if not quick_image:
             quick_image = imagem
@@ -90,10 +99,10 @@ def analisar_rapido():
         if hasattr(request, 'user_id') and request.user_id:
             try:
                 HistoryService.save_image_analysis(
-                    usuario_id=request.user_id,
-                    imagem_nome=imagem_nome,
-                    resultado=resultado[0],
-                    processing_time=processing_time
+                    user_id=request.user_id,
+                    image_name=imagem_nome,
+                    analysis_result=resultado[0],
+                    image_file=imagem_original  # ← Passa a imagem original
                 )
             except Exception as hist_error:
                 print(f"⚠️ Erro ao salvar histórico: {hist_error}")
@@ -117,6 +126,10 @@ def analisar_ultra_rapido():
     imagem_nome = imagem.filename
     
     try:
+        # Lê a imagem original para salvar no histórico
+        imagem_original = io.BytesIO(imagem.read())
+        imagem.seek(0)
+        
         compressed_image = ImageOptimizer.compress_for_api(
             imagem, 
             max_size=(256, 256),
@@ -140,10 +153,10 @@ def analisar_ultra_rapido():
                 full_resultado = resultado[0].copy() if resultado else {}
                 full_resultado["processing_time"] = processing_time
                 HistoryService.save_image_analysis(
-                    usuario_id=request.user_id,
-                    imagem_nome=imagem_nome,
-                    resultado=full_resultado,
-                    processing_time=processing_time
+                    user_id=request.user_id,
+                    image_name=imagem_nome,
+                    analysis_result=full_resultado,
+                    image_file=imagem_original  # ← Passa a imagem original
                 )
             except Exception as hist_error:
                 print(f"⚠️ Erro ao salvar histórico: {hist_error}")

@@ -4,7 +4,6 @@ from flask_cors import CORS
 from controllers.image_controller import image_bp
 from controllers.document_controller import document_bp
 from controllers.auth_controller import auth_bp
-from controllers.history_controller import history_bp
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +14,6 @@ CORS(app)
 
 # Registra blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
-app.register_blueprint(history_bp, url_prefix="/historico")
 app.register_blueprint(image_bp)
 app.register_blueprint(document_bp, url_prefix="/documento")
 

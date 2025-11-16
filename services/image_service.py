@@ -1,6 +1,7 @@
 import os
 import io
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
 genai_api_key = os.getenv("GOOGLE_API_KEY")
 if genai_api_key:
@@ -54,7 +55,8 @@ def process_image_gemini(image_file):
             "temperature": 0.1,
             "top_p": 0.8,
             "top_k": 20,
-            "max_output_tokens": 150,
+            "max_output_tokens": 1024,
+            "candidate_count": 1,
         }
 
         model = genai.GenerativeModel(
@@ -63,7 +65,6 @@ def process_image_gemini(image_file):
         )
 
         prompt = "Em 2 frases: o que você vê nesta imagem? Seja direto e claro."
-
         response = model.generate_content(
             [
                 prompt,
@@ -73,35 +74,54 @@ def process_image_gemini(image_file):
                 }
             ],
             safety_settings={
-                'HARASSMENT': 'block_none',
-                'HATE_SPEECH': 'block_none',
-                'SEXUALLY_EXPLICIT': 'block_none',
-                'DANGEROUS_CONTENT': 'block_none'
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
             }
         )
 
-        if not response.parts:
-            finish_reason = getattr(response.candidates[0], 'finish_reason', None) if response.candidates else None
-            
-            if finish_reason == 2:
+        print(f"[DEBUG] Response candidates: {len(response.candidates) if response.candidates else 0}")
+        if response.candidates:
+            candidate = response.candidates[0]
+            print(f"[DEBUG] Finish reason: {candidate.finish_reason}")
+            print(f"[DEBUG] Safety ratings: {candidate.safety_ratings}")
+            print(f"[DEBUG] Has parts: {bool(response.parts)}")
+        
+        try:
+            text_result = response.text.strip()
+            if text_result:
                 return [{
-                    "objeto": "Não foi possível analisar esta imagem devido a restrições de segurança. Tente outra imagem.",
+                    "objeto": text_result,
                     "confianca": None
                 }]
-            elif finish_reason == 3:
+        except ValueError as ve:
+            print(f"[DEBUG] Erro ao acessar response.text: {ve}")
+        
+        if response.candidates:
+            finish_reason = response.candidates[0].finish_reason
+            safety_ratings = response.candidates[0].safety_ratings
+            
+            print(f"[DEBUG] Imagem bloqueada. Finish reason: {finish_reason}, Safety: {safety_ratings}")
+            
+            if finish_reason == 3:
+                return [{
+                    "objeto": f"A API bloqueou esta imagem por segurança mesmo com filtros desabilitados. Ratings: {safety_ratings}",
+                    "confianca": None
+                }]
+            elif finish_reason == 4:
                 return [{
                     "objeto": "Imagem bloqueada por conter conteúdo protegido por direitos autorais.",
                     "confianca": None
                 }]
             else:
-                print(f"Gemini retornou resposta vazia. finish_reason={finish_reason}")
                 return [{
-                    "objeto": "Não foi possível processar esta imagem. Verifique o formato e tente novamente.",
+                    "objeto": f"Resposta vazia da API. Finish reason: {finish_reason}. Tente outra imagem.",
                     "confianca": None
                 }]
-
+        
         return [{
-            "objeto": response.text.strip(),
+            "objeto": "Não foi possível processar esta imagem. Verifique o formato e tente novamente.",
             "confianca": None
         }]
 

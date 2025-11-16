@@ -3,6 +3,7 @@ import io
 import fitz
 from docx import Document
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 def extract_text_from_pdf(file_content):
     """
     Extrai texto de PDF com estrutura preservada
@@ -153,7 +154,15 @@ def generate_document_summary(text_content):
         {text_content[:4000]}  # Limita para não exceder token limit
         """
         
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
         
         return {
             "resumo": response.text.strip(),

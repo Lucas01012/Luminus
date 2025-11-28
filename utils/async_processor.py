@@ -20,16 +20,13 @@ class AsyncImageProcessor:
     
     async def process_with_cache(self, image_file, mode: str):
         """Processa com cache para evitar reprocessamento"""
-        # Lê conteúdo da imagem
         content = image_file.read()
-        image_file.seek(0)  # Volta ao início
+        image_file.seek(0)
         
-        # Verifica cache primeiro
         cached_result = image_cache.get(content, mode)
         if cached_result:
             return cached_result
         
-        # Processa baseado no modo
         start_time = time.time()
         
         if mode == "vision":
@@ -42,7 +39,6 @@ class AsyncImageProcessor:
         processing_time = time.time() - start_time
         print(f"Processamento {mode}: {processing_time:.2f}s")
         
-        # Armazena no cache
         image_cache.set(content, mode, result)
         
         return result
@@ -52,7 +48,6 @@ class AsyncImageProcessor:
         tasks = []
         
         for mode in modes:
-            # Cria uma cópia do arquivo para cada task
             image_file.seek(0)
             content = image_file.read()
             image_copy = type(image_file)(content)
@@ -60,7 +55,6 @@ class AsyncImageProcessor:
             task = self.process_with_cache(image_copy, mode)
             tasks.append((mode, task))
         
-        # Executa em paralelo
         results = {}
         for mode, task in tasks:
             try:
@@ -70,5 +64,4 @@ class AsyncImageProcessor:
         
         return results
 
-# Instância global
 async_processor = AsyncImageProcessor(max_workers=2)

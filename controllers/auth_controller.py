@@ -19,10 +19,8 @@ def verificar_token():
     - uid: ID do usuário (se válido)
     - email: Email do usuário
     """
-    # Tenta pegar token do header
     token = request.headers.get('Authorization')
     
-    # Se não tiver no header, tenta no body
     if not token:
         data = request.get_json()
         if data and 'token' in data:
@@ -37,7 +35,6 @@ def verificar_token():
         if not resultado['sucesso']:
             return jsonify(resultado), 401
         
-        # Atualiza/cria perfil do usuário
         AuthService.create_or_update_user(
             resultado['uid'], 
             resultado.get('email')
@@ -66,13 +63,11 @@ def obter_perfil():
         return jsonify({"erro": "Token não fornecido"}), 401
     
     try:
-        # Verifica token
         resultado = AuthService.verify_token(token)
         
         if not resultado['sucesso']:
             return jsonify(resultado), 401
         
-        # Busca dados do usuário
         user_info = AuthService.get_user_info(resultado['uid'])
         
         if not user_info:
@@ -118,13 +113,11 @@ def atualizar_perfil():
         return jsonify({"erro": "Nenhum dado fornecido"}), 400
     
     try:
-        # Verifica token
         resultado = AuthService.verify_token(token)
         
         if not resultado['sucesso']:
             return jsonify(resultado), 401
         
-        # Atualiza perfil
         sucesso = AuthService.create_or_update_user(
             resultado['uid'],
             resultado.get('email'),

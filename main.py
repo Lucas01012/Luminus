@@ -12,7 +12,6 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CRE
 app = Flask(__name__)
 CORS(app)
 
-# Registra blueprints
 app.register_blueprint(auth_bp, url_prefix="/auth")
 app.register_blueprint(image_bp)
 app.register_blueprint(document_bp, url_prefix="/documento")

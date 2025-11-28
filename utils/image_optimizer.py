@@ -12,24 +12,19 @@ class ImageOptimizer:
         - Converte para formato eficiente
         """
         try:
-            # Abre a imagem
             image = Image.open(image_file)
             
-            # Converte para RGB se necessário
             if image.mode in ('RGBA', 'LA', 'P'):
                 image = image.convert('RGB')
             
-            # Calcula novo tamanho mantendo proporção
             image.thumbnail(max_size, Image.Resampling.LANCZOS)
             
-            # Salva otimizada em buffer
             output_buffer = io.BytesIO()
             image.save(output_buffer, format='JPEG', quality=quality, optimize=True)
             output_buffer.seek(0)
             
-            # Estatísticas
-            original_size = image_file.seek(0, 2)  # Vai para o final
-            image_file.seek(0)  # Volta para o início
+            original_size = image_file.seek(0, 2)
+            image_file.seek(0)
             optimized_size = len(output_buffer.getvalue())
             
             compression_ratio = (1 - optimized_size / original_size) * 100
@@ -59,7 +54,6 @@ class ImageOptimizer:
             if image.mode in ('RGBA', 'LA', 'P'):
                 image = image.convert('RGB')
             
-            # Resize rápido
             image = image.resize(target_size, Image.Resampling.BILINEAR)
             
             output_buffer = io.BytesIO()

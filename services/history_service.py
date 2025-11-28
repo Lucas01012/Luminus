@@ -28,47 +28,38 @@ class HistoryService:
             
             image_url = None
             
-            # Se a imagem foi fornecida, faz upload para Firebase Storage
             if image_file:
                 try:
-                    # Gera nome único para o arquivo
                     file_extension = image_name.split('.')[-1] if '.' in image_name else 'jpg'
                     unique_filename = f"historico/{user_id}/{doc_ref.id}.{file_extension}"
                     
-                    # Prepara o arquivo para upload
                     blob = bucket.blob(unique_filename)
                     
-                    # Se for FileStorage (Flask), pega o conteúdo
                     if hasattr(image_file, 'read'):
-                        image_file.seek(0)  # Volta ao início do arquivo
+                        image_file.seek(0)
                         image_data = image_file.read()
                     elif hasattr(image_file, 'getvalue'):
-                        # BytesIO
                         image_data = image_file.getvalue()
                     else:
-                        # Já é bytes
                         image_data = image_file
                     
-                    # Upload para Firebase Storage
                     blob.upload_from_string(
                         image_data,
                         content_type=f'image/{file_extension}'
                     )
                     
-                    # Torna público e gera URL
                     blob.make_public()
                     image_url = blob.public_url
                     
-                    print(f"✅ Imagem salva no Storage: {unique_filename}")
+                    print(f"Imagem salva no Storage: {unique_filename}")
                     
                 except Exception as storage_error:
-                    print(f"⚠️ Erro ao salvar imagem no Storage: {storage_error}")
-                    # Continua salvando os dados mesmo sem a imagem
+                    print(f"Erro ao salvar imagem no Storage: {storage_error}")
             
             data = {
                 "usuario_id": user_id,
                 "imagem_nome": image_name,
-                "imagem_url": image_url,  # ← URL da imagem no Storage
+                "imagem_url": image_url,
                 "objeto_detectado": analysis_result.get('objeto', ''),
                 "confianca": analysis_result.get('confianca'),
                 "processing_time": analysis_result.get('processing_time'),
@@ -116,7 +107,6 @@ class HistoryService:
                 data = doc.to_dict()
                 data['id'] = doc.id
                 
-                # Converte timestamp para ISO string
                 if data.get('timestamp'):
                     data['timestamp'] = data['timestamp'].isoformat()
                 
@@ -151,7 +141,6 @@ class HistoryService:
         try:
             doc_ref = db.collection("historico_documentos").document()
             
-            # Limita preview do texto para 500 caracteres
             preview_texto = document_result.get('text_content', '')[:500]
             
             data = {
@@ -207,7 +196,6 @@ class HistoryService:
                 data = doc.to_dict()
                 data['id'] = doc.id
                 
-                # Converte timestamp para ISO string
                 if data.get('timestamp'):
                     data['timestamp'] = data['timestamp'].isoformat()
                 
@@ -239,7 +227,6 @@ class HistoryService:
             lista combinada ordenada por timestamp
         """
         try:
-            # Busca imagens
             imagens_result = HistoryService.get_user_image_history(user_id, limit // 2)
             documentos_result = HistoryService.get_user_document_history(user_id, limit // 2)
             
@@ -249,7 +236,6 @@ class HistoryService:
                     "erro": "Erro ao buscar histórico completo"
                 }
             
-            # Combina e ordena por timestamp
             historico_completo = imagens_result['historico'] + documentos_result['historico']
             historico_completo.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
             
@@ -285,7 +271,6 @@ class HistoryService:
             collection = "historico_imagens" if tipo == 'imagem' else "historico_documentos"
             doc_ref = db.collection(collection).document(doc_id)
             
-            # Verifica se documento existe e pertence ao usuário
             doc = doc_ref.get()
             if not doc.exists:
                 return {

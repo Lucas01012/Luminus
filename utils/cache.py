@@ -20,12 +20,10 @@ class ImageCache:
         if key in self.cache:
             cached_item = self.cache[key]
             
-            # Verifica se não expirou
             if time.time() - cached_item["timestamp"] < self.ttl_seconds:
                 print(f"Cache HIT para {mode}")
                 return cached_item["result"]
             else:
-                # Remove item expirado
                 del self.cache[key]
                 print(f"Cache EXPIRED para {mode}")
         
@@ -36,7 +34,6 @@ class ImageCache:
         """Armazena resultado no cache"""
         key = self._generate_key(image_content, mode)
         
-        # Remove itens antigos se atingir limite
         if len(self.cache) >= self.max_size:
             oldest_key = min(self.cache.keys(), 
                            key=lambda k: self.cache[k]["timestamp"])
@@ -61,5 +58,4 @@ class ImageCache:
             "ttl_seconds": self.ttl_seconds
         }
 
-# Instância global do cache
-image_cache = ImageCache(max_size=50, ttl_seconds=1800)  # 30 minutos
+image_cache = ImageCache(max_size=50, ttl_seconds=1800)

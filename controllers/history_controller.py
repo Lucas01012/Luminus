@@ -46,23 +46,18 @@ def salvar_imagem_manual():
         return jsonify({"sucesso": False, "erro": "image_name é obrigatório"}), 400
     
     try:
-        # Processa imagem base64 se fornecida
         image_file = None
         if image_base64:
             try:
-                # Remove prefixo "data:image/...;base64," se existir
                 if ',' in image_base64:
                     image_base64 = image_base64.split(',', 1)[1]
                 
-                # Decodifica base64
                 image_bytes = base64.b64decode(image_base64)
                 image_file = io.BytesIO(image_bytes)
-                print(f"✅ Imagem base64 decodificada: {len(image_bytes)} bytes")
+                print(f"Imagem base64 decodificada: {len(image_bytes)} bytes")
             except Exception as b64_error:
-                print(f"⚠️ Erro ao decodificar base64: {b64_error}")
-                # Continua sem a imagem
+                print(f"Erro ao decodificar base64: {b64_error}")
         
-        # Salva no histórico
         resultado = HistoryService.save_image_analysis(
             user_id=user_id,
             image_name=image_name,
@@ -76,7 +71,7 @@ def salvar_imagem_manual():
         return jsonify(resultado), 200
         
     except Exception as e:
-        print(f"❌ Erro em salvar_imagem_manual: {str(e)}")
+        print(f"Erro em salvar_imagem_manual: {str(e)}")
         return jsonify({"sucesso": False, "erro": f"Erro ao salvar: {str(e)}"}), 500
 
 

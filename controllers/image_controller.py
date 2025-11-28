@@ -1,45 +1,42 @@
 from flask import Blueprint, request, jsonify
-from services.image_service import process_image_vision, process_image_gemini
-from google.cloud import vision  # necessário para o OCR
+from services.image_service import process_image_gemini
 from utils.image_optimizer import ImageOptimizer
+from middleware.auth_middleware import optional_auth
 import traceback
 import time
+import io
 
 image_bp = Blueprint("image", __name__)
 
 
 @image_bp.route("/analisar", methods=["POST"])
+@optional_auth
 def analisar():
+    """
+    Analisa imagem com Gemini AI (descrição detalhada para acessibilidade)
+    """
     start_time = time.time()
     
     if "imagem" not in request.files:
         return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
 
     imagem = request.files["imagem"]
-    modo = request.args.get("modo", "gemini")
 
     try:
-        # Otimiza imagem
-        if modo == "vision":
-            optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(800, 800), quality=85)
-        else:
-            optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(512, 512), quality=70)
+        # Reduz MUITO o tamanho para evitar finish_reason=2 (MAX_TOKENS)
+        # Fotos da câmera vêm muito grandes e excedem o limite
+        optimizer_result = ImageOptimizer.optimize_for_ai(imagem, max_size=(384, 384), quality=60)
         
         if optimizer_result["success"]:
             optimized_image = optimizer_result["optimized_image"]
-            print(f"Otimização: {optimizer_result['compression_ratio']}% menor - {optimizer_result['optimized_size']} bytes")
+            print(f"Imagem otimizada: {optimizer_result['compression_ratio']}% menor")
         else:
             optimized_image = imagem
             imagem.seek(0)
         
-        # Processa com imagem otimizada
-        if modo == "vision":
-            resultado = process_image_vision(optimized_image)
-        else:
-            resultado = process_image_gemini(optimized_image)
+        resultado = process_image_gemini(optimized_image)
         
         processing_time = time.time() - start_time
-        # Corrigido: resultado é lista
         resultado[0]["processing_time"] = round(processing_time, 2)
         
         return jsonify(resultado[0])
@@ -51,6 +48,7 @@ def analisar():
 
 
 @image_bp.route("/analisar-rapido", methods=["POST"])
+@optional_auth
 def analisar_rapido():
     """
     Versão otimizada para máxima velocidade
@@ -63,13 +61,11 @@ def analisar_rapido():
     imagem = request.files["imagem"]
     
     try:
-        # Redimensionamento ultra-rápido
         quick_image = ImageOptimizer.quick_resize(imagem, target_size=(256, 256))
         if not quick_image:
             quick_image = imagem
             imagem.seek(0)
         
-        # Só Gemini (mais rápido que Vision)
         resultado = process_image_gemini(quick_image)
         
         processing_time = time.time() - start_time
@@ -83,6 +79,7 @@ def analisar_rapido():
 
 
 @image_bp.route("/analisar-ultra", methods=["POST"])
+@optional_auth
 def analisar_ultra_rapido():
     """Versão ultra-otimizada para máxima velocidade (sub 3 segundos)"""
     start_time = time.time()
@@ -111,7 +108,6 @@ def analisar_ultra_rapido():
         }
         
         response = jsonify(response_data)
-        
         response.headers['Cache-Control'] = 'no-cache, no-store'
         response.headers['Connection'] = 'close'
         
@@ -125,20 +121,3 @@ def analisar_ultra_rapido():
         }), 500
 
 
-@image_bp.route("/ler-texto", methods=["POST"])
-def analisar_texto_imagem():
-    if "imagem" not in request.files:
-        return jsonify({"erro": "Nenhuma imagem foi enviada"}), 400
-
-    imagem = request.files["imagem"]
-    
-    client = vision.ImageAnnotatorClient()
-    content = imagem.read()
-    image = vision.Image(content=content)
-
-    response = client.text_detection(image=image)
-    texts = response.text_annotations
-
-    texto_detectado = texts[0].description if texts else "Nenhum texto detectado"
-
-    return jsonify({"texto": texto_detectado})

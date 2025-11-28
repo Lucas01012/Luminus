@@ -1,12 +1,9 @@
 import os
 import io
-import fitz  # PyMuPDF
+import fitz
 from docx import Document
-from PIL import Image
 import google.generativeai as genai
-from google.cloud import vision
-import base64
-from google.cloud import texttospeech
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 def extract_text_from_pdf(file_content):
     """
     Extrai texto de PDF com estrutura preservada
@@ -33,7 +30,6 @@ def extract_text_from_pdf(file_content):
         for page_num in range(len(pdf_doc)):
             page = pdf_doc.load_page(page_num)
             
-            # Extrai texto estruturado
             blocks = page.get_text("dict")
             page_text = ""
             page_structure = {
@@ -54,7 +50,6 @@ def extract_text_from_pdf(file_content):
                             font_size = max(font_size, span["size"])
                         
                         if line_text.strip():
-                            # Identifica títulos por tamanho da fonte
                             if font_size > 14:
                                 page_structure["headings"].append({
                                     "text": line_text.strip(),
@@ -105,7 +100,6 @@ def extract_text_from_docx(file_content):
         
         for para in doc.paragraphs:
             if para.text.strip():
-                # Verifica se é um título
                 if para.style.name.startswith('Heading'):
                     level = int(para.style.name.split()[-1]) if para.style.name.split()[-1].isdigit() else 1
                     extracted_data["structure"]["headings"].append({
@@ -119,7 +113,6 @@ def extract_text_from_docx(file_content):
                 
                 full_text += para.text + "\n"
         
-        # Processa tabelas
         for table in doc.tables:
             table_data = []
             for row in table.rows:
@@ -140,74 +133,7 @@ def extract_text_from_docx(file_content):
     except Exception as e:
         return {"erro": f"Erro ao processar DOCX: {str(e)}"}
 
-def extract_text_from_image(image_content):
-    """
-    OCR avançado para extrair texto de imagens/documentos escaneados
-    """
-    try:
-        client = vision.ImageAnnotatorClient()
-        image = vision.Image(content=image_content)
-        
-        # OCR com detecção de estrutura de documento
-        response = client.document_text_detection(image=image)
-        document = response.full_text_annotation
-        
-        if not document.text:
-            return {"erro": "Nenhum texto detectado na imagem"}
-        
-        extracted_data = {
-            "text_content": document.text,
-            "structure": {
-                "blocks": [],
-                "paragraphs": [],
-                "words": []
-            },
-            "confidence": 0
-        }
-        
-        # Processa blocos de texto estruturados
-        for page in document.pages:
-            for block in page.blocks:
-                block_text = ""
-                block_confidence = 0
-                
-                for paragraph in block.paragraphs:
-                    para_text = ""
-                    para_confidence = 0
-                    
-                    for word in paragraph.words:
-                        word_text = ''.join([symbol.text for symbol in word.symbols])
-                        word_confidence = sum([symbol.confidence for symbol in word.symbols]) / len(word.symbols)
-                        
-                        para_text += word_text + " "
-                        para_confidence += word_confidence
-                        
-                        extracted_data["structure"]["words"].append({
-                            "text": word_text,
-                            "confidence": round(word_confidence, 2)
-                        })
-                    
-                    if para_text.strip():
-                        extracted_data["structure"]["paragraphs"].append({
-                            "text": para_text.strip(),
-                            "confidence": round(para_confidence / len(paragraph.words), 2)
-                        })
-                        block_text += para_text + "\n"
-                
-                if block_text.strip():
-                    extracted_data["structure"]["blocks"].append({
-                        "text": block_text.strip(),
-                        "confidence": round(block_confidence, 2)
-                    })
-        
-        # Calcula confiança geral
-        word_confidences = [word["confidence"] for word in extracted_data["structure"]["words"]]
-        extracted_data["confidence"] = round(sum(word_confidences) / len(word_confidences), 2) if word_confidences else 0
-        
-        return extracted_data
-        
-    except Exception as e:
-        return {"erro": f"Erro no OCR da imagem: {str(e)}"}
+
 
 def generate_document_summary(text_content):
     """
@@ -228,7 +154,15 @@ def generate_document_summary(text_content):
         {text_content[:4000]}  # Limita para não exceder token limit
         """
         
-        response = model.generate_content(prompt)
+        response = model.generate_content(
+            prompt,
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            }
+        )
         
         return {
             "resumo": response.text.strip(),
@@ -242,10 +176,8 @@ def extract_keywords_from_text(text):
     """
     Extrai palavras-chave importantes do texto
     """
-    # Implementação simples - pode ser melhorada com NLP mais avançado
     words = text.lower().split()
     
-    # Remove palavras comuns (stop words)
     stop_words = {
         'o', 'a', 'os', 'as', 'um', 'uma', 'uns', 'umas', 'de', 'do', 'da', 'dos', 'das',
         'em', 'no', 'na', 'nos', 'nas', 'por', 'para', 'com', 'sem', 'sob', 'sobre',
@@ -255,7 +187,6 @@ def extract_keywords_from_text(text):
         'aquele', 'aquela', 'aqueles', 'aquelas', 'isto', 'isso', 'aquilo'
     }
     
-    # Filtra palavras significativas
     keywords = []
     word_count = {}
     
@@ -264,7 +195,6 @@ def extract_keywords_from_text(text):
         if len(clean_word) > 3 and clean_word not in stop_words:
             word_count[clean_word] = word_count.get(clean_word, 0) + 1
     
-    # Ordena por frequência e pega as top 10
     sorted_words = sorted(word_count.items(), key=lambda x: x[1], reverse=True)
     keywords = [word for word, count in sorted_words[:10]]
     
@@ -279,7 +209,6 @@ def search_text_in_document(text_content, search_term):
     
     for i, line in enumerate(lines):
         if search_term.lower() in line.lower():
-            # Contexto: linha anterior, atual e próxima
             context_start = max(0, i - 1)
             context_end = min(len(lines), i + 2)
             context = '\n'.join(lines[context_start:context_end])
@@ -294,5 +223,56 @@ def search_text_in_document(text_content, search_term):
     return {
         "termo_busca": search_term,
         "total_ocorrencias": len(results),
-        "resultados": results[:10]  # Limita a 10 resultados
+        "resultados": results[:10]
     }
+
+def process_document(file_content, file_name, file_type, gerar_resumo=True):
+    """
+    Processa documentos PDF e DOCX
+    - PDFs: extração com PyMuPDF preservando estrutura
+    - DOCX: extração com python-docx incluindo tabelas
+    - Resumo: geração automática com Gemini AI (opcional)
+    """
+    try:
+        is_pdf = 'pdf' in file_type.lower() or file_name.lower().endswith('.pdf')
+        is_docx = ('word' in file_type.lower() or 
+                   'document' in file_type.lower() or 
+                   file_name.lower().endswith(('.docx', '.doc')))
+        
+        if not (is_pdf or is_docx):
+            return {
+                "erro": "Tipo de arquivo não suportado. Use PDF ou DOCX.",
+                "tipos_aceitos": ["PDF", "DOCX"]
+            }
+        
+        print(f"Processando {'PDF' if is_pdf else 'DOCX'}: {file_name}")
+        
+        if is_pdf:
+            resultado = extract_text_from_pdf(file_content)
+        else:
+            resultado = extract_text_from_docx(file_content)
+        
+        if not resultado or 'erro' in resultado:
+            return resultado or {"erro": "Erro ao processar documento"}
+        
+        resultado['arquivo_info'] = {
+            'nome': file_name,
+            'tipo': file_type,
+            'tamanho_bytes': len(file_content),
+            'formato': 'PDF' if is_pdf else 'DOCX'
+        }
+        
+        if gerar_resumo and resultado.get('text_content'):
+            print("Gerando resumo com Gemini...")
+            resumo_data = generate_document_summary(resultado['text_content'])
+            
+            if 'erro' not in resumo_data:
+                resultado['resumo'] = resumo_data.get('resumo')
+                resultado['palavras_chave'] = resumo_data.get('palavras_chave')
+        
+        print("Documento processado com sucesso!")
+        return resultado
+        
+    except Exception as e:
+        print(f"Erro: {str(e)}")
+        return {"erro": f"Erro ao processar documento: {str(e)}"}

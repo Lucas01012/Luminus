@@ -82,6 +82,20 @@ def extract_text_from_pdf(file_content):
             
             extracted_data["structure"]["pages"].append(page_structure)
             full_text += f"\n--- Página {page_num + 1} ---\n" + page_text
+            
+            # Se a página não tem texto, tentar OCR na imagem da página
+            if not page_text.strip() and TESSERACT_AVAILABLE:
+                try:
+                    print(f"  Página {page_num + 1} sem texto, aplicando OCR...")
+                    pix = page.get_pixmap(dpi=150)
+                    img_bytes = pix.tobytes("png")
+                    pil_img = Image.open(io.BytesIO(img_bytes))
+                    ocr_text = pytesseract.image_to_string(pil_img, lang='por', config='--oem 3 --psm 6').strip()
+                    if ocr_text:
+                        full_text += f"[OCR]: {ocr_text}\n"
+                        print(f"  ✓ OCR extraiu {len(ocr_text)} caracteres")
+                except Exception as e:
+                    print(f"  Erro no OCR página {page_num + 1}: {e}")
         
         pdf_doc.close()
         extracted_data["text_content"] = full_text
@@ -161,7 +175,7 @@ def generate_document_summary(text_content):
         3. Estrutura do documento (tipo de documento, seções principais)
         
         Texto para resumir:
-        {text_content[:4000]}  # Limita para não exceder token limit
+        {text_content[:15000]}
         """
         
         response = model.generate_content(

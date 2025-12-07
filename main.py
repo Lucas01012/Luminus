@@ -7,7 +7,9 @@ from controllers.auth_controller import auth_bp
 from dotenv import load_dotenv
 
 load_dotenv()
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+google_creds = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if google_creds:
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds
 
 app = Flask(__name__)
 CORS(app)

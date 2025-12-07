@@ -15,26 +15,29 @@ def processar_documento():
     Aceita:
     - arquivo: PDF ou DOCX
     - gerar_resumo: true/false (opcional, padrão: true)
+    - analisar_imagens: true/false (opcional, padrão: true)
     
     Retorna:
-    - text_content: texto completo extraído
+    - text_content: texto completo extraído + descrição de imagens
     - structure: estrutura do documento (títulos, parágrafos, tabelas)
     - arquivo_info: metadados do arquivo
     - resumo: resumo gerado por IA (se solicitado)
     - palavras_chave: palavras-chave principais
+    - imagens_analisadas: número de imagens processadas
     """
     if "arquivo" not in request.files:
         return jsonify({"erro": "Nenhum arquivo enviado no campo 'arquivo'"}), 400
     
     arquivo = request.files["arquivo"]
     gerar_resumo = request.form.get("gerar_resumo", "true").lower() == "true"
+    analisar_imagens = request.form.get("analisar_imagens", "true").lower() == "true"
     
     try:
         file_content = arquivo.read()
         file_type = arquivo.content_type or ""
         file_name = arquivo.filename or "documento"
         
-        resultado = process_document(file_content, file_name, file_type, gerar_resumo)
+        resultado = process_document(file_content, file_name, file_type, gerar_resumo, analisar_imagens)
         
         if "erro" in resultado:
             return jsonify(resultado), 400

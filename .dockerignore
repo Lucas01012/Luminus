@@ -1,0 +1,25 @@
+# Arquivos Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Credenciais
+firebase-creds.json
+google_vision_key.json
+credentials/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

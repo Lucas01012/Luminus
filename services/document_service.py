@@ -26,8 +26,8 @@ def process_document_with_gemini(file_content, file_name, mime_type):
             uploaded_file = genai.upload_file(tmp_path, mime_type=mime_type)
             print(f"✓ Arquivo enviado: {uploaded_file.uri}")
             
-            # Processar com Gemini 2.0 Flash
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            # Processar com Gemini 2.5 Flash
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             prompt = """Analise este documento completamente e forneça:
 

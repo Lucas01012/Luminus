@@ -1,18 +1,118 @@
 import os
 import io
+import tempfile
 import fitz
 from docx import Document
 from PIL import Image
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 
-# Tentar importar pytesseract (opcional)
-try:
-    import pytesseract
-    TESSERACT_AVAILABLE = True
-except ImportError:
-    TESSERACT_AVAILABLE = False
-    print("⚠️ pytesseract não instalado. Análise de imagens desabilitada.")
+
+def process_document_with_gemini(file_content, file_name, mime_type):
+    """
+    Envia arquivo direto pro Gemini 2.0 Flash para análise completa
+    """
+    try:
+        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        
+        # Salvar temporariamente para upload
+        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file_name)[1]) as tmp_file:
+            tmp_file.write(file_content)
+            tmp_path = tmp_file.name
+        
+        try:
+            # Upload do arquivo para Gemini
+            print(f"📤 Enviando {file_name} para Gemini...")
+            uploaded_file = genai.upload_file(tmp_path, mime_type=mime_type)
+            print(f"✓ Arquivo enviado: {uploaded_file.uri}")
+            
+            # Processar com Gemini 2.0 Flash
+            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            
+            prompt = """Analise este documento completamente e forneça:
+
+1. **TEXTO COMPLETO**: Extraia TODO o texto do documento, incluindo:
+   - Títulos e cabeçalhos
+   - Parágrafos
+   - Texto em imagens (se houver)
+   - Tabelas
+   - Legendas
+
+2. **RESUMO**: Gere um resumo estruturado com:
+   - Resumo principal (2-3 frases)
+   - Pontos-chave (máximo 5 tópicos)
+   - Tipo e estrutura do documento
+
+3. **IMAGENS**: Se houver imagens no documento, descreva:
+   - Tipo de elemento visual (gráfico, foto, diagrama, etc)
+   - Conteúdo principal
+   - Texto visível na imagem
+   - Como se relaciona com o documento
+
+Formato da resposta:
+===== TEXTO COMPLETO =====
+[texto extraído]
+
+===== RESUMO =====
+[resumo estruturado]
+
+===== IMAGENS =====
+[descrição das imagens, se houver]
+"""
+            
+            response = model.generate_content(
+                [uploaded_file, prompt],
+                safety_settings={
+                    HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                    HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                }
+            )
+            
+            # Parsear resposta
+            texto_completo = response.text
+            
+            # Tentar separar seções
+            resultado = {
+                "text_content": "",
+                "resumo": "",
+                "imagens_info": "",
+                "arquivo_info": {
+                    "nome": file_name,
+                    "tamanho_bytes": len(file_content),
+                    "processado_com": "Gemini 2.0 Flash"
+                }
+            }
+            
+            if "===== TEXTO COMPLETO =====" in texto_completo:
+                partes = texto_completo.split("=====")
+                for i, parte in enumerate(partes):
+                    if "TEXTO COMPLETO" in parte and i+1 < len(partes):
+                        resultado["text_content"] = partes[i+1].strip()
+                    elif "RESUMO" in parte and i+1 < len(partes):
+                        resultado["resumo"] = partes[i+1].strip()
+                    elif "IMAGENS" in parte and i+1 < len(partes):
+                        resultado["imagens_info"] = partes[i+1].strip()
+            else:
+                # Se não tiver formatação, usa tudo como texto
+                resultado["text_content"] = texto_completo
+            
+            # Extrair palavras-chave do texto
+            if resultado["text_content"]:
+                resultado["palavras_chave"] = extract_keywords_from_text(resultado["text_content"])
+            
+            print("✅ Documento processado com Gemini!")
+            return resultado
+            
+        finally:
+            # Limpar arquivo temporário
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            
+    except Exception as e:
+        print(f"❌ Erro ao processar com Gemini: {e}")
+        return {"erro": f"Erro ao processar documento: {str(e)}"}
 
 def extract_text_from_pdf(file_content):
     """
@@ -354,10 +454,9 @@ Descreva brevemente:
 
 def process_document(file_content, file_name, file_type, gerar_resumo=True, analisar_imagens=True):
     """
-    Processa documentos PDF e DOCX
-    - PDFs: extração com PyMuPDF preservando estrutura
-    - DOCX: extração com python-docx incluindo tabelas
-    - Resumo: geração automática com Gemini AI (opcional)
+    Processa documentos PDF e DOCX enviando direto pro Gemini 2.0 Flash
+    - Análise completa: texto, imagens, tabelas
+    - Resumo automático incluído
     """
     try:
         is_pdf = 'pdf' in file_type.lower() or file_name.lower().endswith('.pdf')
@@ -371,63 +470,19 @@ def process_document(file_content, file_name, file_type, gerar_resumo=True, anal
                 "tipos_aceitos": ["PDF", "DOCX"]
             }
         
-        print(f"Processando {'PDF' if is_pdf else 'DOCX'}: {file_name}")
+        print(f"🚀 Processando {file_name} com Gemini 2.0 Flash...")
         
+        # Determinar MIME type
         if is_pdf:
-            resultado = extract_text_from_pdf(file_content)
+            mime_type = "application/pdf"
         else:
-            resultado = extract_text_from_docx(file_content)
+            mime_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         
-        if not resultado or 'erro' in resultado:
-            return resultado or {"erro": "Erro ao processar documento"}
+        # Processar com Gemini
+        resultado = process_document_with_gemini(file_content, file_name, mime_type)
         
-        # Processar imagens se solicitado
-        if analisar_imagens and TESSERACT_AVAILABLE:
-            print("📸 Analisando imagens...")
-            if is_pdf:
-                pdf_doc = fitz.open(stream=file_content, filetype="pdf")
-                images = extract_images_from_pdf(pdf_doc)
-                pdf_doc.close()
-            else:
-                images = extract_images_from_docx(file_content)
-            
-            if images:
-                image_texts = []
-                # Passar contexto do documento para análise
-                doc_context = resultado.get('text_content', '')
-                
-                for idx, img_info in enumerate(images, 1):
-                    page = img_info.get('page', 'N/A')
-                    desc, ocr_text = analyze_image_with_ocr(
-                        img_info['image'],
-                        doc_context,  # ← CONTEXTO DO DOCUMENTO
-                        page
-                    )
-                    if desc and ocr_text:
-                        image_texts.append(f"\n[Imagem {idx}{f' - Pág.{page}' if page != 'N/A' else ''}]\n💬 Texto: {ocr_text[:200]}\n📝 {desc}")
-                
-                if image_texts:
-                    resultado['text_content'] += "\n\n" + "="*60 + "\n📸 TEXTO DE IMAGENS (OCR)\n" + "="*60 + "".join(image_texts)
-                    resultado['imagens_analisadas'] = len(image_texts)
-        
-        resultado['arquivo_info'] = {
-            'nome': file_name,
-            'tipo': file_type,
-            'tamanho_bytes': len(file_content),
-            'formato': 'PDF' if is_pdf else 'DOCX'
-        }
-        
-        if gerar_resumo and resultado.get('text_content'):
-            print("Gerando resumo com Gemini...")
-            resumo_data = generate_document_summary(resultado['text_content'])
-            
-            if 'erro' not in resumo_data:
-                resultado['resumo'] = resumo_data.get('resumo')
-                resultado['palavras_chave'] = resumo_data.get('palavras_chave')
-        
-        print("Documento processado com sucesso!")
         return resultado
         
     except Exception as e:
-        print(f"Erro: {str(e)}")
+        print(f"❌ Erro: {str(e)}")
         return {"erro": f"Erro ao processar documento: {str(e)}"}

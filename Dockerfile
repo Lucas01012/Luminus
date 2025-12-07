@@ -1,12 +1,6 @@
 # Use Python 3.11 slim
 FROM python:3.11-slim
 
-# Instalar dependências do sistema (Tesseract OCR)
-RUN apt-get update && apt-get install -y \
-    tesseract-ocr \
-    tesseract-ocr-por \
-    && rm -rf /var/lib/apt/lists/*
-
 # Diretório de trabalho
 WORKDIR /app
 

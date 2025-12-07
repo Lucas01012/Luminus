@@ -406,7 +406,7 @@ def analyze_image_with_ocr(pil_image, document_context="", page_num=None):
         
         # Análise com Gemini COM CONTEXTO
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Usar contexto mais amplo do documento (até 3000 caracteres)
         context_preview = document_context[:3000] if document_context else ""

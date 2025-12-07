@@ -293,31 +293,52 @@ def analyze_image_with_ocr(pil_image, document_context="", page_num=None):
         return None, ""
     
     try:
+        # Debug: verificar se contexto está chegando
+        print(f"  🔍 Contexto recebido: {len(document_context)} caracteres")
+        
         # OCR
         texto_ocr = pytesseract.image_to_string(pil_image, lang='por', config='--oem 3 --psm 6').strip()
         if not texto_ocr or len(texto_ocr) < 10:
+            print(f"  ⚠️ OCR muito curto ou vazio ({len(texto_ocr)} chars)")
             return None, ""
+        
+        print(f"  ✓ OCR extraiu {len(texto_ocr)} caracteres")
         
         # Análise com Gemini COM CONTEXTO
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         model = genai.GenerativeModel('gemini-1.5-flash')
         
-        # Contexto do documento para Gemini entender melhor
-        context_preview = document_context[:500] if document_context else "Documento sem texto adicional"
+        # Usar contexto mais amplo do documento (até 3000 caracteres)
+        context_preview = document_context[:3000] if document_context else ""
         
-        prompt = f"""Você está analisando uma imagem encontrada em um documento.
+        if context_preview:
+            prompt = f"""Analise esta imagem que faz parte de um documento maior.
 
-CONTEXTO DO DOCUMENTO:
+===== CONTEÚDO DO DOCUMENTO COMPLETO =====
 {context_preview}
+==========================================
 
-TEXTO EXTRAÍDO DA IMAGEM (OCR):
+===== TEXTO EXTRAÍDO DESTA IMAGEM (OCR) =====
+{texto_ocr}
+==============================================
+
+Página: {page_num if page_num else 'N/A'}
+
+Com base no CONTEÚDO COMPLETO DO DOCUMENTO acima, analise esta imagem e responda de forma ESPECÍFICA E PRECISA:
+- Que tipo de elemento visual é (banner, gráfico, foto, logo, diagrama)?
+- Qual é o conteúdo/mensagem principal desta imagem?
+- Como esta imagem se relaciona com o tema e conteúdo do documento?
+
+Seja específico e use informações do documento para contextualizar."""
+        else:
+            prompt = f"""Analise esta imagem:
+
+TEXTO EXTRAÍDO (OCR):
 {texto_ocr}
 
-PÁGINA: {page_num if page_num else 'N/A'}
-
-Baseado no contexto do documento e no texto da imagem, descreva em 2-3 linhas:
-1. Tipo de elemento (banner/gráfico/tabela/logo/foto)
-2. Informação principal e como se relaciona com o documento"""
+Descreva brevemente:
+1. Tipo de elemento visual
+2. Conteúdo/mensagem principal"""
         
         response = model.generate_content(prompt, safety_settings={
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,

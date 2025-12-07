@@ -26,8 +26,8 @@ def process_document_with_gemini(file_content, file_name, mime_type):
             uploaded_file = genai.upload_file(tmp_path, mime_type=mime_type)
             print(f"✓ Arquivo enviado: {uploaded_file.uri}")
             
-            # Processar com Gemini 2.0 Flash
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            # Processar com Gemini 2.5 Flash
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             prompt = """Analise este documento completamente e forneça:
 
@@ -406,7 +406,7 @@ def analyze_image_with_ocr(pil_image, document_context="", page_num=None):
         
         # Análise com Gemini COM CONTEXTO
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Usar contexto mais amplo do documento (até 3000 caracteres)
         context_preview = document_context[:3000] if document_context else ""

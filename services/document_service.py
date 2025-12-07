@@ -287,8 +287,8 @@ def extract_images_from_docx(file_content):
     return images
 
 
-def analyze_image_with_ocr(pil_image):
-    """Extrai texto da imagem com OCR e analisa com Gemini"""
+def analyze_image_with_ocr(pil_image, document_context="", page_num=None):
+    """Extrai texto da imagem com OCR e analisa com Gemini usando contexto do documento"""
     if not TESSERACT_AVAILABLE:
         return None, ""
     
@@ -298,14 +298,26 @@ def analyze_image_with_ocr(pil_image):
         if not texto_ocr or len(texto_ocr) < 10:
             return None, ""
         
-        # Análise com Gemini
+        # Análise com Gemini COM CONTEXTO
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
         model = genai.GenerativeModel('gemini-1.5-flash')
-        prompt = f"""Texto extraído de imagem em documento:
+        
+        # Contexto do documento para Gemini entender melhor
+        context_preview = document_context[:500] if document_context else "Documento sem texto adicional"
+        
+        prompt = f"""Você está analisando uma imagem encontrada em um documento.
 
+CONTEXTO DO DOCUMENTO:
+{context_preview}
+
+TEXTO EXTRAÍDO DA IMAGEM (OCR):
 {texto_ocr}
 
-Resuma em 2 linhas: tipo de elemento (banner/gráfico/tabela) e informação principal."""
+PÁGINA: {page_num if page_num else 'N/A'}
+
+Baseado no contexto do documento e no texto da imagem, descreva em 2-3 linhas:
+1. Tipo de elemento (banner/gráfico/tabela/logo/foto)
+2. Informação principal e como se relaciona com o documento"""
         
         response = model.generate_content(prompt, safety_settings={
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -360,10 +372,17 @@ def process_document(file_content, file_name, file_type, gerar_resumo=True, anal
             
             if images:
                 image_texts = []
+                # Passar contexto do documento para análise
+                doc_context = resultado.get('text_content', '')
+                
                 for idx, img_info in enumerate(images, 1):
-                    desc, ocr_text = analyze_image_with_ocr(img_info['image'])
+                    page = img_info.get('page', 'N/A')
+                    desc, ocr_text = analyze_image_with_ocr(
+                        img_info['image'],
+                        doc_context,  # ← CONTEXTO DO DOCUMENTO
+                        page
+                    )
                     if desc and ocr_text:
-                        page = img_info.get('page', 'N/A')
                         image_texts.append(f"\n[Imagem {idx}{f' - Pág.{page}' if page != 'N/A' else ''}]\n💬 Texto: {ocr_text[:200]}\n📝 {desc}")
                 
                 if image_texts:
